@@ -1,0 +1,113 @@
+/**
+ * Statistics object reference for testing and debugging purposes
+ *
+ * For example, it can be used as a mock for prepareStats as a way of not using Github API
+ * and therefore not exhausting call limit
+ */
+export const statistics = {
+    repoStat: {
+        timePeriod: { until: '2022-12-20T09:00:00Z', since: '2022-12-19T09:00:00Z' },
+        newIssues: 17,
+        resolvedIssues: 18,
+        closedAsStaleIssues: 0,
+        newPulls: 0,
+        mergedPulls: 1,
+        remainingIssues: 144,
+    },
+    activityStat: {
+        'adguard-bot': 6,
+        SKEIDs: 2,
+        AetherMagee: 1,
+        zloyden: 19,
+        Dimsday: 1,
+        AdamWr: 20,
+        piquark6046: 1,
+        krystian3w: 1,
+        BlazDT: 2,
+    },
+    activitiesByUser: {
+        'adguard-bot': {
+            resolvedIssues: 0,
+            newPulls: 0,
+            mergedPulls: 0,
+            pullRequestsReview: 0,
+            totalCommits: 0,
+            totalComments: 6,
+        },
+        SKEIDs: {
+            resolvedIssues: 0,
+            newPulls: 0,
+            mergedPulls: 0,
+            pullRequestsReview: 1,
+            totalCommits: 0,
+            totalComments: 0,
+        },
+        AetherMagee: {
+            resolvedIssues: 0,
+            newPulls: 0,
+            mergedPulls: 0,
+            pullRequestsReview: 0,
+            totalCommits: 0,
+            totalComments: 1,
+        },
+        zloyden: {
+            resolvedIssues: 8,
+            newPulls: 0,
+            mergedPulls: 0,
+            pullRequestsReview: 1,
+            totalCommits: 7,
+            totalComments: 3,
+        },
+        Dimsday: {
+            resolvedIssues: 0,
+            newPulls: 0,
+            mergedPulls: 0,
+            pullRequestsReview: 0,
+            totalCommits: 0,
+            totalComments: 1,
+        },
+        AdamWr: {
+            resolvedIssues: 10,
+            newPulls: 0,
+            mergedPulls: 0,
+            pullRequestsReview: 0,
+            totalCommits: 7,
+            totalComments: 3,
+        },
+        piquark6046: {
+            resolvedIssues: 0,
+            newPulls: 0,
+            mergedPulls: 0,
+            pullRequestsReview: 1,
+            totalCommits: 0,
+            totalComments: 0,
+        },
+        krystian3w: {
+            resolvedIssues: 0,
+            newPulls: 0,
+            mergedPulls: 0,
+            pullRequestsReview: 0,
+            totalCommits: 0,
+            totalComments: 1,
+        },
+        BlazDT: {
+            resolvedIssues: 0,
+            newPulls: 0,
+            mergedPulls: 0,
+            pullRequestsReview: 0,
+            totalCommits: 1,
+            totalComments: 1,
+        },
+    },
+    activitiesByTime: {
+        'adguard-bot': { '2022-12-20': [Array] },
+        SKEIDs: { '2022-12-20': [Array] },
+        AetherMagee: { '2022-12-20': [Array] },
+        zloyden: { '2022-12-20': [Array] },
+        Dimsday: { '2022-12-20': [Array] },
+        AdamWr: { '2022-12-20': [Array] },
+        piquark6046: { '2022-12-20': [Array] },
+        krystian3w: { '2022-12-20': [Array] },
+        BlazDT: { '2022-12-20': [Array] },
+    },
+};

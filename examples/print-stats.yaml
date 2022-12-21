@@ -1,0 +1,39 @@
+name: Print stats
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: 'Repository path'
+        required: true
+        type: string
+        default: 'AdguardTeam/AdguardFilters'
+      since:
+        description: 'Timestamp to search from'
+        required: false
+        type: string
+        default: '2022-05-01T00:00:00Z'
+      until:
+        description: 'Timestamp to search to'
+        required: false
+        type: string
+        default: '2022-06-01T00:00:00Z'
+
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - name: Install package
+        run: npm i -g @adguard/github-stats
+      - name: Print repo stats
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COLLECTION_PATH: ./stats-data
+          REPO: ${{ github.event.inputs.repo }}
+          SINCE: ${{ github.event.inputs.since }}
+          UNTIL: ${{ github.event.inputs.until }}
+        run: github-stats

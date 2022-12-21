@@ -1,0 +1,27 @@
+name: Publish stats
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - name: Install package
+        run: yarn
+      - name: Publish repo stats
+        env:
+          LEGEND_URL: ${{ secrets.LEGEND_URL }}
+          OAUTH_TOKEN: ${{ secrets.OAUTH_TOKEN }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SINCE: ${{ github.event.inputs.since }}
+          UNTIL: ${{ github.event.inputs.until }}
+          COLLECTION_PATH: ./stats-data
+          REPO: AdguardTeam/AdguardFilters
+        run: node -r esm ./bin/github-publish.js

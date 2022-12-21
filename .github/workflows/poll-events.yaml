@@ -1,0 +1,29 @@
+name: Poll events
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - name: Install package
+        run: yarn
+      - name: Poll Github events
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COLLECTION_PATH: ./stats-data
+          REPO: AdguardTeam/AdguardFilters
+        run: node -r esm ./bin/github-poll.js
+      - name: commit artifacts
+        uses: EndBug/add-and-commit@v9
+        with:
+          message: Events collection update
