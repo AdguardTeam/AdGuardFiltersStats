@@ -15,11 +15,19 @@ import { getEventsFromCollection } from '../tools/fs-utils';
 export const prepareStats = async (collectionPath, commonRequestData, timePeriod) => {
     const eventsFromPeriod = await getEventsFromCollection(collectionPath, timePeriod);
 
+    console.log(eventsFromPeriod);
+
     const repoStat = await prepareRepoStat(eventsFromPeriod, commonRequestData, timePeriod);
+
+    console.log(repoStat);
 
     const contributors = prepareContributors(eventsFromPeriod);
     const activityStat = prepareActivityStat(contributors);
     const detailedActivityStat = prepareDetailedActivityStat(contributors);
+
+    console.log(contributors);
+    console.log(activityStat);
+    console.log(detailedActivityStat);
 
     return {
         repoStat,
