@@ -28,5 +28,10 @@ const timePeriod = {
 
 (async () => {
     const statistics = await prepareStats(COLLECTION_PATH, commonRequestData, timePeriod);
+
+    console.log(statistics.repoStat);
+    console.log(statistics.activityStat);
+    console.log(statistics.activitiesByUser);
+
     await publishStats(SLACK_OAUTH_TOKEN, SLACK_CHANNEL_ID, statistics);
 })();
