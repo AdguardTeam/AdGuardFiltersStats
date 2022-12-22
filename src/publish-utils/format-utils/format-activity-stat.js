@@ -1,15 +1,15 @@
 import { getTextBlock } from './get-text-block';
 import { isTeamMember } from '../is-team-member';
+import { README_URL } from '../../constants';
 
 /**
  * Converts activity stat object to an array of Slack blocks
  * @param {Object} activityStat
- * @param {string} legendMessageUrl URl to a slack message
  * @returns {Object[]}
  */
-export const formatActivityStat = (activityStat, legendMessageUrl) => {
+export const formatActivityStat = (activityStat) => {
     // Render empty block if message url is not supplied
-    const legendMessage = legendMessageUrl ? getTextBlock(`_By activity points (<${legendMessageUrl}|what is it?>)_`) : getTextBlock(' ');
+    const legendMessage = getTextBlock(`_By activity points (<${README_URL}|what is it?>)_`);
     const blocks = [
         getTextBlock('🙇 General contributors statistics', 'plain_text', 'header'),
         legendMessage,

@@ -31,9 +31,8 @@ jobs:
         run: yarn
       - name: Publish repo stats
         env:
-          LEGEND_URL: ${{ secrets.LEGEND_URL }}
-          OAUTH_TOKEN: ${{ secrets.OAUTH_TOKEN }}
-          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+          SLACK_OAUTH_TOKEN: ${{ secrets.SLACK_OAUTH_TOKEN }}
+          SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COLLECTION_PATH: ./stats-data
           REPO: ${{ github.event.inputs.repo }}

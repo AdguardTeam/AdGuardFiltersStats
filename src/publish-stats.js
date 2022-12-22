@@ -12,11 +12,10 @@ import { MIN_REQUIRED_ACTIVITY } from './constants';
 /**
  * Prepare and publish statistics data to a Slack channel
  * @param {string} oauthToken
- * @param {string} legendMessageUrl url to an arbitrary slack message
  * @param {string} channelId
  * @param {Object} statistics
  */
-export const publishStats = async (oauthToken, legendMessageUrl, channelId, statistics) => {
+export const publishStats = async (oauthToken, channelId, statistics) => {
     const {
         repoStat,
         activityStat,
@@ -24,7 +23,7 @@ export const publishStats = async (oauthToken, legendMessageUrl, channelId, stat
     } = pruneStatistics(statistics, MIN_REQUIRED_ACTIVITY);
 
     const repoStatBlocks = formatRepoStat(repoStat);
-    const generalActivityBlocks = formatActivityStat(activityStat, legendMessageUrl);
+    const generalActivityBlocks = formatActivityStat(activityStat);
     const detailedUserBlocks = formatUserActivity(activitiesByUser);
 
     const client = makeClient(oauthToken);

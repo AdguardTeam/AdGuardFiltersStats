@@ -51,9 +51,8 @@ env \
 
 ```
 env \
-    LEGEND_URL=url \
-    OAUTH_TOKEN=token \
-    CHANNEL_ID=id \
+    SLACK_OAUTH_TOKEN=token \
+    SLACK_CHANNEL_ID=id \
     COLLECTION_PATH=stats-data \
     REPO=AdguardTeam/AdguardFilters \
     UNTIL=2022-11-22T21:00:00Z \
@@ -68,6 +67,5 @@ env \
 * `UNTIL` — optional, timestamp in ISO 8601 format: `YYYY-MM-DDTHH:MM:SS`. Defaults to now.
 * `SINCE` — optional, timestamp in ISO 8601 format: `YYYY-MM-DDTHH:MM:SS`. All stored events will be used if not provided.
 #### Additional params for publishing
-* `OAUTH_TOKEN` — required, Slack App token 
-* `CHANNEL_ID` — required, channel id to post messages to
-* `LEGEND_URL` — optional, URL to an arbitrary resource that is supposed to be a legend to statistics. This is not displayed by default.
+* `SLACK_OAUTH_TOKEN` — required, Slack App token 
+* `SLACK_CHANNEL_ID` — required, channel id to post messages to
