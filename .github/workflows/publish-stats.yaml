@@ -16,7 +16,6 @@ jobs:
         run: yarn
       - name: Publish repo stats
         env:
-          LEGEND_URL: ${{ secrets.LEGEND_URL }}
           OAUTH_TOKEN: ${{ secrets.OAUTH_TOKEN }}
           CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

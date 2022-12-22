@@ -10,6 +10,8 @@ export const TEAM_MEMBERS = [
 ];
 export const EXCLUDED_USERNAMES = ['adguard-bot'];
 
+export const README_URL = 'https://github.com/AdguardTeam/AdGuardFiltersStats#github-stats-cli-app';
+
 export const MILLISECONDS_IN_DAY = 1000 * 60 * 60 * 24;
 export const EVENT_EXPIRATION_DAYS = 30;
 export const ENDPOINTS = {

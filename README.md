@@ -51,7 +51,6 @@ env \
 
 ```
 env \
-    LEGEND_URL=url \
     OAUTH_TOKEN=token \
     CHANNEL_ID=id \
     COLLECTION_PATH=stats-data \
@@ -70,4 +69,3 @@ env \
 #### Additional params for publishing
 * `OAUTH_TOKEN` — required, Slack App token 
 * `CHANNEL_ID` — required, channel id to post messages to
-* `LEGEND_URL` — optional, URL to an arbitrary resource that is supposed to be a legend to statistics. This is not displayed by default.
