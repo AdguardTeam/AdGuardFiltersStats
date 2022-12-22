@@ -7,8 +7,8 @@ import { publishStats } from '../src/publish-stats';
 dotenv.config();
 
 const {
-    OAUTH_TOKEN,
-    CHANNEL_ID,
+    SLACK_OAUTH_TOKEN,
+    SLACK_CHANNEL_ID,
     COLLECTION_PATH,
     REPO,
     SINCE,
@@ -28,5 +28,5 @@ const timePeriod = {
 
 (async () => {
     const statistics = await prepareStats(COLLECTION_PATH, commonRequestData, timePeriod);
-    await publishStats(OAUTH_TOKEN, CHANNEL_ID, statistics);
+    await publishStats(SLACK_OAUTH_TOKEN, SLACK_CHANNEL_ID, statistics);
 })();
