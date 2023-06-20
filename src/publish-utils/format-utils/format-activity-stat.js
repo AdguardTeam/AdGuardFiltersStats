@@ -26,26 +26,26 @@ export const formatActivityStat = (activityStat) => {
         return 0;
     });
 
-    let teamMembersListStr = '';
-    let contributorsListStr = '';
+    let teamMembersStr = '';
+    let contributorsStr = '';
 
     sortedByActivity.forEach((stat) => {
         const [username, userstat] = stat;
-        const userListItemStr = `• ${username}: ${userstat}\n`;
+        const userItemStr = `• ${username}: ${userstat}\n`;
 
         if (isTeamMember(username)) {
-            teamMembersListStr += userListItemStr;
+            teamMembersStr += userItemStr;
             return;
         }
 
-        contributorsListStr += userListItemStr;
+        contributorsStr += userItemStr;
     });
 
-    if (teamMembersListStr.length > 0) {
-        blocks.push(getTextBlock(`${TEAM_MEMBERS_STAT_HEADER}\n${teamMembersListStr}`));
+    if (teamMembersStr.length > 0) {
+        blocks.push(getTextBlock(`${TEAM_MEMBERS_STAT_HEADER}\n${teamMembersStr}`));
     }
-    if (contributorsListStr.length > 0) {
-        blocks.push(getTextBlock(`${CONTRIBUTORS_STAT_HEADER}\n${contributorsListStr}`));
+    if (contributorsStr.length > 0) {
+        blocks.push(getTextBlock(`${CONTRIBUTORS_STAT_HEADER}\n${contributorsStr}`));
     }
 
     return blocks;
