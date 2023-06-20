@@ -2,6 +2,9 @@ import { getTextBlock } from './get-text-block';
 import { isTeamMember } from '../is-team-member';
 import { README_URL } from '../../constants';
 
+const TEAM_MEMBERS_STAT_HEADER = ':adguard: *AdGuard team*';
+const CONTRIBUTORS_STAT_HEADER = ':bust_in_silhouette: *Contributors*';
+
 /**
  * Converts activity stat object to an array of Slack blocks
  * @param {Object} activityStat
@@ -23,23 +26,27 @@ export const formatActivityStat = (activityStat) => {
         return 0;
     });
 
-    let teamMembers = ':adguard: *AdGuard team*\n';
-    let contributors = ':bust_in_silhouette: *Contributors*\n';
+    let teamMembersStr = '';
+    let contributorsStr = '';
 
     sortedByActivity.forEach((stat) => {
         const [username, userstat] = stat;
-        const userString = `• ${username}: ${userstat}\n`;
+        const userItemStr = `• ${username}: ${userstat}\n`;
 
         if (isTeamMember(username)) {
-            teamMembers += userString;
+            teamMembersStr += userItemStr;
             return;
         }
 
-        contributors += userString;
+        contributorsStr += userItemStr;
     });
 
-    blocks.push(getTextBlock(teamMembers));
-    blocks.push(getTextBlock(contributors));
+    if (teamMembersStr.length > 0) {
+        blocks.push(getTextBlock(`${TEAM_MEMBERS_STAT_HEADER}\n${teamMembersStr}`));
+    }
+    if (contributorsStr.length > 0) {
+        blocks.push(getTextBlock(`${CONTRIBUTORS_STAT_HEADER}\n${contributorsStr}`));
+    }
 
     return blocks;
 };
