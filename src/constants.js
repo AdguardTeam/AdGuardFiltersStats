@@ -7,6 +7,7 @@ export const TEAM_MEMBERS = [
     'BlazDT',
     'jellizaveta',
     'piquark6046',
+    'ntnguyen1234',
 ];
 export const EXCLUDED_USERNAMES = ['adguard-bot'];
 
