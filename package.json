@@ -1,6 +1,6 @@
 {
     "name": "@adguard/github-stats",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "author": "Adguard Software Ltd.",
     "license": "MIT",
     "bin": {
