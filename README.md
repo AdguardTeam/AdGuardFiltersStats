@@ -2,7 +2,18 @@
 
 CLI App that polls data from GitHub REST API, stores it and gives analysis on contributors activity for given repository.
 
-Here's what counts as activity: <a id="activity_count"></a>
+* [Activity count](#activity_count)
+* [How to install](#how-to-install)
+* [How to run](#how-to-run)
+    * [Poll events](#poll-events)
+    * [Print stats in console](#print-stats)
+    * [Publish stats to a slack channel](#publish-stats)
+    * [Params](#params)
+
+## <a id="activity_count"></a> Activity count
+
+Here's what counts as activity:
+
 * commit,
 * closed Issue (not marked as Stale),
 * a comment in an Issue or a Pull request,
@@ -11,16 +22,9 @@ Here's what counts as activity: <a id="activity_count"></a>
 
 Examples of Github Actions for these scripts can be found in `examples` folder.
 
-* [How to install](#how-to-install)
-* [How to run](#how-to-run)
-    * [Poll events](#poll-events)
-    * [Print stats in console](#print-stats)
-    * [Publish stats to a slack channel](#publish-stats)
-    * [Params](#params)
-
 ## <a id="how-to-install"></a> How to install
 
-```
+```bash
 npm i -g @adguard/github-stats
 ```
 
@@ -28,16 +32,17 @@ npm i -g @adguard/github-stats
 
 ### <a id="poll-events"></a> Poll events
 
-```
+```bash
 env \
     COLLECTION_PATH=stats-data \
     GITHUB_TOKEN=token \
     REPO=AdguardTeam/AdguardFilters \
     github-poll
 ```
+
 ### <a id="print-stats"></a> Print stats in console
 
-```
+```bash
 env \
     COLLECTION_PATH=stats-data \
     GITHUB_TOKEN=token \
@@ -49,7 +54,7 @@ env \
 
 ### <a id="publish-stats"></a> Publish stats to a slack channel
 
-```
+```bash
 env \
     SLACK_OAUTH_TOKEN=token \
     SLACK_CHANNEL_ID=id \
@@ -59,6 +64,7 @@ env \
     SINCE=2022-11-21T21:00:00Z \
     github-publish
 ```
+
 ### <a id="params"></a> Params
 
 * `COLLECTION_PATH` — required, path to a jsonl file that stores events
@@ -66,6 +72,8 @@ env \
 * `REPO` — required, path to a Github repository as `{owner}/{repo_name}`
 * `UNTIL` — optional, timestamp in ISO 8601 format: `YYYY-MM-DDTHH:MM:SS`. Defaults to now.
 * `SINCE` — optional, timestamp in ISO 8601 format: `YYYY-MM-DDTHH:MM:SS`. All stored events will be used if not provided.
+
 #### Additional params for publishing
-* `SLACK_OAUTH_TOKEN` — required, Slack App token 
+
+* `SLACK_OAUTH_TOKEN` — required, Slack App token
 * `SLACK_CHANNEL_ID` — required, channel id to post messages to
