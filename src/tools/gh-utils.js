@@ -82,7 +82,7 @@ export const getGithubEvents = async (commonRequestData = {}) => {
     } catch (error) {
         if (error.status === 403 && error.response?.headers?.[X_RATE_LIMIT_REMAINING_HEADER] === '0') {
             rateLimitReached = true;
-            rateLimitReset = error.response.headers[X_RATE_LIMIT_RESET_HEADER];
+            rateLimitReset = parseInt(error.response.headers[X_RATE_LIMIT_RESET_HEADER], 10);
             // eslint-disable-next-line no-console
             console.error(`GitHub API rate limit exceeded. Limit will reset at ${new Date(rateLimitReset * 1000).toISOString()}`);
         } else {
