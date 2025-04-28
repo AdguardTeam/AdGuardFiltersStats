@@ -1,7 +1,7 @@
 {
     "name": "@adguard/github-stats",
-    "version": "1.0.0",
-    "author": "AdGuard",
+    "version": "1.0.1",
+    "author": "Adguard Software Ltd.",
     "license": "MIT",
     "bin": {
         "github-poll": "./bin/github-poll.js",

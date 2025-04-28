@@ -5,6 +5,7 @@ import {
     remove,
     readdir,
     ensureDir,
+    writeFile,
 } from 'fs-extra';
 import {
     format,
@@ -193,9 +194,22 @@ const removeOldFilesFromCollection = async (path, expirationDays) => {
     });
 };
 
+/**
+ * Writes metadata to a JSON file.
+ *
+ * @param {string} path Path to the file.
+ * @param {Object} metadata Metadata to write.
+ */
+const writeMetadataToFile = async (path, metadata) => {
+    await ensureDir(path.substring(0, path.lastIndexOf('/')));
+    const metadataJson = JSON.stringify(metadata, null, 2);
+    await writeFile(path, metadataJson);
+};
+
 export {
     getEventsFromCollection,
     writePollToCollection,
     removeDupesFromCollection,
     removeOldFilesFromCollection,
+    writeMetadataToFile,
 };

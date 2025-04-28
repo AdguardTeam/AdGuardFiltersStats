@@ -7,6 +7,7 @@ export const TEAM_MEMBERS = [
     'BlazDT',
     'jellizaveta',
     'piquark6046',
+    'ntnguyen1234',
 ];
 export const EXCLUDED_USERNAMES = ['adguard-bot'];
 
@@ -40,3 +41,10 @@ export const ACTION_NAMES = {
 };
 
 export const COLLECTION_FILE_EXTENSION = '.jsonl';
+
+/**
+ * Maximum number of most recent events to collect.
+ *
+ * GitHub Events API only returns up to 300 most recent events.
+ */
+export const MAX_NUMBER_OF_MOST_RECENT_EVENTS = 300;
