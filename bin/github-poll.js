@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import * as dotenv from 'dotenv';
 import { format } from 'date-fns';
-import { pollEvents } from '../src/poll-events';
-import { MAX_NUMBER_OF_MOST_RECENT_EVENTS } from '../src/constants';
+import { pollEvents } from '../src/poll-events.js';
+import { MAX_NUMBER_OF_MOST_RECENT_EVENTS } from '../src/constants.js';
 
 dotenv.config();
 const { COLLECTION_PATH, REPO } = process.env;
