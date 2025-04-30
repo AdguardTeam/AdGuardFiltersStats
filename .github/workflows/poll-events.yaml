@@ -30,7 +30,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COLLECTION_PATH: ./stats-data
           REPO: AdguardTeam/AdguardFilters
-        run: node -r esm ./bin/github-poll.js
+        run: node ./bin/github-poll.js
       - name: commit artifacts
         uses: EndBug/add-and-commit@v9
         with:

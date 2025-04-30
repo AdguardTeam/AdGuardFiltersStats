@@ -3,13 +3,14 @@
     "version": "1.0.1",
     "author": "Adguard Software Ltd.",
     "license": "MIT",
+    "type": "module",
     "bin": {
         "github-poll": "./bin/github-poll.js",
         "github-push": "./bin/github-push.js",
         "github-stats": "./bin/github-stats.js"
     },
     "scripts": {
-        "publish": "node -r esm ./bin/github-publish.js",
+        "publish": "node ./bin/github-publish.js",
         "test": "jest",
         "lint": "eslint .",
         "lint-staged": "lint-staged"
