@@ -1,13 +1,13 @@
 import path from 'path';
 import { format } from 'date-fns';
-import { getGithubEvents } from './tools/gh-utils.js';
-import { EVENT_EXPIRATION_DAYS } from './constants.js';
+import { getGithubEvents } from './tools/gh-utils';
+import { EVENT_EXPIRATION_DAYS } from './constants';
 import {
     removeOldFilesFromCollection,
     writePollToCollection,
     removeDupesFromCollection,
     writeMetadataToFile,
-} from './tools/fs-utils.js';
+} from './tools/fs-utils';
 
 /**
  * Polls events from Github Events API and stores them on a given path

@@ -1,4 +1,4 @@
-import { TEAM_MEMBERS } from '../constants.js';
+import { TEAM_MEMBERS } from '../constants';
 
 /**
  * Check if given user is from own team

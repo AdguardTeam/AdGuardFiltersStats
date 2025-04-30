@@ -16,13 +16,13 @@ import { intersection } from 'lodash/array';
 import { Readable } from 'stream';
 import { chain } from 'stream-chain';
 import { parser } from 'stream-json/jsonl/Parser';
-import { reduceStream } from './stream-utils.js';
+import { reduceStream } from './stream-utils';
 import {
     isCreatedSince,
     isCreatedUntil,
     sortEventsByDate,
-} from './events-utils.js';
-import { MILLISECONDS_IN_DAY, COLLECTION_FILE_EXTENSION } from '../constants.js';
+} from './events-utils';
+import { MILLISECONDS_IN_DAY, COLLECTION_FILE_EXTENSION } from '../constants';
 
 /**
  * Gets array of GitHub event objects from file and by timePeriod

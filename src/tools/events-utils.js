@@ -3,7 +3,7 @@ import {
     EVENT_TYPES,
     LABEL_NAMES,
     ACTION_NAMES,
-} from '../constants.js';
+} from '../constants';
 
 /**
  * Determines if Github event is 'opened'
