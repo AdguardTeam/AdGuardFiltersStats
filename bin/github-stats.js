@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as dotenv from 'dotenv';
-import { prepareStats } from '../src/prepare-stats/prepare-stats';
-import { printStats } from '../src/print-stats';
+import { prepareStats } from '../src/prepare-stats/prepare-stats.js';
+import { printStats } from '../src/print-stats.js';
 
 dotenv.config();
 

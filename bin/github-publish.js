@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import * as dotenv from 'dotenv';
 import { startOfYesterday, endOfYesterday } from 'date-fns';
-import { prepareStats } from '../src/prepare-stats/prepare-stats';
-import { publishStats } from '../src/publish-stats';
+import { prepareStats } from '../src/prepare-stats/prepare-stats.js';
+import { publishStats } from '../src/publish-stats.js';
 
 dotenv.config();
 
