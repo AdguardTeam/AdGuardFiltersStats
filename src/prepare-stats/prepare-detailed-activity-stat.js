@@ -1,5 +1,5 @@
-import { countEventsByType, eventsToActivityByTime } from '../tools/events-utils';
-import { EVENT_TYPES } from '../constants';
+import { countEventsByType, eventsToActivityByTime } from '../tools/events-utils.js';
+import { EVENT_TYPES } from '../constants.js';
 
 /**
  * Count and sort activities

@@ -1,11 +1,11 @@
-import { getOpenIssues } from '../tools/gh-utils';
+import { getOpenIssues } from '../tools/gh-utils.js';
 import {
     isStale,
     isMerged,
     isClosedAction,
     isOpenedAction,
-} from '../tools/events-utils';
-import { EVENT_TYPES } from '../constants';
+} from '../tools/events-utils.js';
+import { EVENT_TYPES } from '../constants.js';
 
 /**
  * Prepare general repo stats

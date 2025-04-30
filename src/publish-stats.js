@@ -6,8 +6,8 @@ import {
     formatRepoStat,
     formatActivityStat,
     formatUserActivity,
-} from './publish-utils';
-import { MIN_REQUIRED_ACTIVITY } from './constants';
+} from './publish-utils/index.js';
+import { MIN_REQUIRED_ACTIVITY } from './constants.js';
 
 /**
  * Prepare and publish statistics data to a Slack channel
