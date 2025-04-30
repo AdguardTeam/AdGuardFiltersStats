@@ -1,5 +1,5 @@
 import { Octokit } from '@octokit/core';
-import { ENDPOINTS, MAX_NUMBER_OF_MOST_RECENT_EVENTS } from '../constants.js';
+import { ENDPOINTS, MAX_NUMBER_OF_MOST_RECENT_EVENTS } from '../constants';
 
 const { GITHUB_TOKEN } = process.env;
 

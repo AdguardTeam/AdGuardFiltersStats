@@ -1,8 +1,8 @@
-import { prepareRepoStat } from './prepare-repo-stat.js';
-import { prepareContributors } from './prepare-contributors.js';
-import { prepareActivityStat } from './prepare-contributors-stat.js';
-import { prepareDetailedActivityStat } from './prepare-detailed-activity-stat.js';
-import { getEventsFromCollection } from '../tools/fs-utils.js';
+import { prepareRepoStat } from './prepare-repo-stat';
+import { prepareContributors } from './prepare-contributors';
+import { prepareActivityStat } from './prepare-contributors-stat';
+import { prepareDetailedActivityStat } from './prepare-detailed-activity-stat';
+import { getEventsFromCollection } from '../tools/fs-utils';
 
 /**
  * Process all stored events to compose statistics object

@@ -3,6 +3,7 @@
         "airbnb-base"
     ],
     "env": {
+        "node": true,
         "jest": true
     },
     "rules": {

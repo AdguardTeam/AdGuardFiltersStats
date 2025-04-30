@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { getTextBlock } from './get-text-block.js';
+import { getTextBlock } from './get-text-block';
 
 /**
  * Converts general repo stat object to array of Slack blocks

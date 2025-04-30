@@ -23,12 +23,15 @@ jobs:
       - name: Install package
         run: yarn install
 
+      - name: Build package
+        run: yarn build
+
       - name: Poll Github events
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COLLECTION_PATH: ./stats-data
           REPO: AdguardTeam/AdguardFilters
-        run: node ./bin/github-poll.js
+        run: yarn poll
       - name: commit artifacts
         uses: EndBug/add-and-commit@v9
         with:

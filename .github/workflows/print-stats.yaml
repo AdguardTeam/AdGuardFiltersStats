@@ -37,6 +37,9 @@ jobs:
       - name: Install package
         run: yarn install
 
+      - name: Build package
+        run: yarn build
+
       - name: Print repo stats
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -44,7 +47,7 @@ jobs:
           REPO: ${{ github.event.inputs.repo }}
           SINCE: ${{ github.event.inputs.since }}
           UNTIL: ${{ github.event.inputs.until }}
-        run: node ./bin/github-stats.js
+        run: yarn stats
   notify:
     needs: stats
     # Run this job only if the previous job failed

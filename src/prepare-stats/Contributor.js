@@ -1,5 +1,5 @@
-import { getCommitsCount } from '../tools/events-utils.js';
-import { EVENT_TYPES } from '../constants.js';
+import { getCommitsCount } from '../tools/events-utils';
+import { EVENT_TYPES } from '../constants';
 
 export class Contributor {
     constructor() {

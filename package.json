@@ -3,14 +3,16 @@
     "version": "1.0.1",
     "author": "Adguard Software Ltd.",
     "license": "MIT",
-    "type": "module",
     "bin": {
         "github-poll": "./bin/github-poll.js",
-        "github-push": "./bin/github-push.js",
+        "github-publish": "./bin/github-publish.js",
         "github-stats": "./bin/github-stats.js"
     },
     "scripts": {
+        "poll": "node ./bin/github-poll.js",
+        "stats": "node ./bin/github-stats.js",
         "publish": "node ./bin/github-publish.js",
+        "build": "rollup -c",
         "test": "jest",
         "lint": "eslint .",
         "lint-staged": "lint-staged"
@@ -37,6 +39,9 @@
         "@babel/core": "^7.20.5",
         "@babel/node": "^7.20.5",
         "@babel/preset-env": "^7.20.2",
+        "@rollup/plugin-babel": "^6.0.4",
+        "@rollup/plugin-commonjs": "^28.0.3",
+        "@rollup/plugin-node-resolve": "^16.0.1",
         "babel-jest": "^29.3.1",
         "eslint": "^8.28.0",
         "eslint-config-airbnb-base": "^15.0.0",
@@ -44,6 +49,7 @@
         "esm": "^3.2.25",
         "husky": "^8.0.2",
         "jest": "^29.3.1",
-        "lint-staged": "^13.1.0"
+        "lint-staged": "^13.1.0",
+        "rollup": "^4.40.1"
     }
 }
