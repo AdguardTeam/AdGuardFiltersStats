@@ -34,7 +34,7 @@ jobs:
           UNTIL: ${{ github.event.inputs.until }}
           COLLECTION_PATH: ./stats-data
           REPO: AdguardTeam/AdguardFilters
-        run: yarn publish
+        run: yarn run publish
   notify:
     needs: stats
     # Run this job only if the previous job failed
