@@ -3,7 +3,7 @@ import {
     repoStatToString,
     activityToString,
     detailedActivityToString,
-} from './tools/print-utils';
+} from '../tools/print-utils';
 
 /**
  * Prepares statistics strings and prints them to console
