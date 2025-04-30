@@ -44,7 +44,7 @@ jobs:
           REPO: ${{ github.event.inputs.repo }}
           SINCE: ${{ github.event.inputs.since }}
           UNTIL: ${{ github.event.inputs.until }}
-        run: node --experimental-specifier-resolution=node ./bin/github-stats.js
+        run: node ./bin/github-stats.js
   notify:
     needs: stats
     # Run this job only if the previous job failed
