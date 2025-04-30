@@ -1,5 +1,5 @@
-import { getTextBlock } from './get-text-block';
-import { getUserIcon } from './get-user-icon';
+import { getTextBlock } from './get-text-block.js';
+import { getUserIcon } from './get-user-icon.js';
 
 /**
  * Converts contributor's stats to an array of formatted block messages

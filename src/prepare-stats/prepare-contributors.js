@@ -1,5 +1,5 @@
-import { Contributor } from './Contributor';
-import { getActivityAuthor } from '../tools/events-utils';
+import { Contributor } from './Contributor.js';
+import { getActivityAuthor } from '../tools/events-utils.js';
 
 /**
  * Sorts events by contributor name and event type

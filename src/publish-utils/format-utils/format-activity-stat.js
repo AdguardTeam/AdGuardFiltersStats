@@ -1,6 +1,6 @@
-import { getTextBlock } from './get-text-block';
-import { isTeamMember } from '../is-team-member';
-import { README_URL } from '../../constants';
+import { getTextBlock } from './get-text-block.js';
+import { isTeamMember } from '../is-team-member.js';
+import { README_URL } from '../../constants.js';
 
 const TEAM_MEMBERS_STAT_HEADER = ':adguard: *AdGuard team*';
 const CONTRIBUTORS_STAT_HEADER = ':bust_in_silhouette: *Contributors*';

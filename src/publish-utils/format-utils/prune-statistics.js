@@ -1,5 +1,5 @@
-import { isTeamMember } from '../is-team-member';
-import { EXCLUDED_USERNAMES } from '../../constants';
+import { isTeamMember } from '../is-team-member.js';
+import { EXCLUDED_USERNAMES } from '../../constants.js';
 
 /**
  * Prune statistics object to exclude users by given params

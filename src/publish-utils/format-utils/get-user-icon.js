@@ -1,4 +1,4 @@
-import { isTeamMember } from '../is-team-member';
+import { isTeamMember } from '../is-team-member.js';
 
 /**
  * Returns icon code

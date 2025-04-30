@@ -58,6 +58,6 @@ const reduceStream = (stream, cb, initArray = []) => {
     });
 };
 
-module.exports = {
+export {
     reduceStream,
 };
