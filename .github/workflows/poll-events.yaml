@@ -28,3 +28,19 @@ jobs:
         with:
           message: Events collection update
           default_author: github_actions
+  notify:
+    needs: poll
+    # Run this job only if the previous job failed
+    # Note: 'always()' is needed to run the notify job even if the poll job was failed
+    if: ${{ always() && needs.poll.result == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          fields: workflow, repo, message, commit, author, eventName, ref, job
+          job_name: poll
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
