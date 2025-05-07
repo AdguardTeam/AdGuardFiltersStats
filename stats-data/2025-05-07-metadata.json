@@ -1,0 +1,11 @@
+{
+  "totalEvents": 192,
+  "pagesCollected": 7,
+  "rateLimitReached": false,
+  "rateLimitRemaining": 4991,
+  "rateLimitReset": "2025-05-07T01:14:20.000Z",
+  "timestamp": "2025-05-07T00:14:43.080Z",
+  "eventsWritten": 192,
+  "collectionPath": "./stats-data",
+  "repo": "AdguardTeam/AdguardFilters"
+}
