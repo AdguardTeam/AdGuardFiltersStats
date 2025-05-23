@@ -22,11 +22,11 @@ const X_RATE_LIMIT_REMAINING_HEADER = 'x-ratelimit-remaining';
 /**
  * Number of events per page.
  *
- * Default is 30 but we can request up to 100.
+ * GitHub Events API typically returns 30 events per page.
  *
  * @see {@link https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api?apiVersion=2022-11-28#about-pagination}
  */
-const NUMBER_OF_EVENTS_PER_PAGE = 100;
+const NUMBER_OF_EVENTS_PER_PAGE = 30;
 
 /**
  * Get GitHub events from with pagination.
@@ -50,7 +50,6 @@ export const getGithubEvents = async (commonRequestData = {}) => {
             const { headers, data } = await octokit.request(ENDPOINTS.GITHUB_EVENTS, {
                 ...commonRequestData,
                 page: pageNumber,
-                per_page: NUMBER_OF_EVENTS_PER_PAGE,
             });
 
             // Track rate limit information
