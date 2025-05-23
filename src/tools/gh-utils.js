@@ -53,6 +53,13 @@ export const getGithubEvents = async (commonRequestData = {}) => {
                 per_page: NUMBER_OF_EVENTS_PER_PAGE,
             });
 
+            // eslint-disable-next-line no-console
+            console.log('Collected data');
+            // eslint-disable-next-line no-console
+            console.log(`headers: ${JSON.stringify(headers)}`);
+            // eslint-disable-next-line no-console
+            console.log(`data.length: ${data.length}`);
+
             // Track rate limit information
             rateLimitRemaining = parseInt(headers[X_RATE_LIMIT_REMAINING_HEADER], 10);
             rateLimitReset = parseInt(headers[X_RATE_LIMIT_RESET_HEADER], 10);
