@@ -44,10 +44,9 @@ const getEventsFromFile = async (path, timePeriod) => {
         const createdSince = isCreatedSince(event, since);
         if (createdSince && createdUntil) {
             accArray.push(event);
-        } else if (!createdSince) {
-            // Return null to stop the stream
-            return null;
         }
+        // IMPORTANT: Always continue processing the stream
+        // so do not return `null`
         return undefined;
     };
 
