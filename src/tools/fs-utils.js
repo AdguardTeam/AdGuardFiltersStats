@@ -45,8 +45,10 @@ const getEventsFromFile = async (path, timePeriod) => {
         if (createdSince && createdUntil) {
             accArray.push(event);
         }
-        // IMPORTANT: Always continue processing the stream
-        // so do not return `null`
+        // IMPORTANT: Always continue processing the stream,
+        // so do not return `null`.
+        // Otherwise, the stream will exit on the first event if it does not match timePeriod,
+        // but following events may still match it.
         return undefined;
     };
 
