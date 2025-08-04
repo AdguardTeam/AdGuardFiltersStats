@@ -1,11 +1,11 @@
 {
-  "totalEvents": 117,
-  "pagesCollected": 4,
+  "totalEvents": 133,
+  "pagesCollected": 5,
   "rateLimitReached": false,
-  "rateLimitRemaining": 4994,
-  "rateLimitReset": "2025-08-04T07:07:57.000Z",
-  "timestamp": "2025-08-04T06:08:17.904Z",
-  "eventsWritten": 117,
+  "rateLimitRemaining": 4993,
+  "rateLimitReset": "2025-08-04T08:09:25.000Z",
+  "timestamp": "2025-08-04T07:09:46.478Z",
+  "eventsWritten": 133,
   "collectionPath": "./stats-data",
   "repo": "AdguardTeam/AdguardFilters"
 }
