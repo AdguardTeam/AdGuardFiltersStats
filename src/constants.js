@@ -4,13 +4,18 @@
  * Team members are always included regardless of this threshold.
  */
 export const MIN_REQUIRED_ACTIVITY = 5;
+
+/**
+ * AdGuard filters maintainers.
+ *
+ * @see {@link https://github.com/orgs/AdguardTeam/teams/filters-maintainers}
+ */
 export const TEAM_MEMBERS = [
     'Alex-302',
     'Sergey-Lyapin',
     'AdamWr',
     'zloyden',
     'BlazDT',
-    'jellizaveta',
     'piquark6046',
     'ntnguyen1234',
 ];
