@@ -32,6 +32,8 @@ npm i -g @adguard/github-stats
 
 ### <a id="poll-events"></a> Poll events
 
+Polls events from GitHub API and stores them in JSONL files (one per day) along with metadata files.
+
 ```bash
 env \
     COLLECTION_PATH=stats-data \
@@ -39,6 +41,17 @@ env \
     REPO=AdguardTeam/AdguardFilters \
     github-poll
 ```
+
+#### Metadata fields
+
+* `totalEvents` — total number of events fetched from GitHub API
+* `eventsWritten` — number of unique events written to file after deduplication
+* `pagesCollected` — number of API pages processed
+* `rateLimitReached` — whether API rate limit was reached
+* `rateLimitRemaining` — remaining API requests
+* `rateLimitReset` — when the rate limit will reset
+
+> Note: `eventsWritten` may be less than `totalEvents` due to deduplication of events that appear in multiple poll runs.
 
 ### <a id="print-stats"></a> Print stats in console
 

@@ -40,6 +40,12 @@ jobs:
       - name: Build package
         run: yarn build
 
+      - name: Log time range
+        run: |
+          echo "Time range for stats collection:"
+          echo "  SINCE: ${{ github.event.inputs.since }}"
+          echo "  UNTIL: ${{ github.event.inputs.until }}"
+
       - name: Publish repo stats
         env:
           SLACK_OAUTH_TOKEN: ${{ secrets.SLACK_OAUTH_TOKEN }}
