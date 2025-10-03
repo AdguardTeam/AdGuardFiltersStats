@@ -19,7 +19,14 @@ export const TEAM_MEMBERS = [
     'piquark6046',
     'ntnguyen1234',
 ];
-export const EXCLUDED_USERNAMES = ['adguard-bot'];
+
+/**
+ * Usernames to exclude from stats.
+ */
+export const EXCLUDED_USERNAMES = [
+    'adguard-bot',
+    'github-actions[bot]',
+];
 
 export const README_URL = 'https://github.com/AdguardTeam/AdGuardFiltersStats#github-stats-cli-app';
 
