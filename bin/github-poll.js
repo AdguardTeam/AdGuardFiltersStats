@@ -4,7 +4,7 @@
 var dotenv = require('dotenv');
 var dateFns = require('date-fns');
 var path = require('path');
-var fsUtils = require('./fs-utils-DKM0XxU5.js');
+var fsUtils = require('./fs-utils-Dbn0OUFq.js');
 require('@octokit/core');
 require('fs-extra');
 require('stream');
@@ -55,7 +55,7 @@ const pollEvents = async (collectionPath, commonRequestData) => {
 
     // Write events to collection
     await fsUtils.writePollToCollection(collectionPath, events);
-    await fsUtils.removeDupesFromCollection(collectionPath);
+    const actualEventsWritten = await fsUtils.removeDupesFromCollection(collectionPath);
     await fsUtils.removeOldFilesFromCollection(collectionPath, fsUtils.EVENT_EXPIRATION_DAYS);
 
     // Store metadata for diagnostics
@@ -63,7 +63,7 @@ const pollEvents = async (collectionPath, commonRequestData) => {
     const metadataPath = path.join(collectionPath, `${today}-metadata.json`);
     await fsUtils.writeMetadataToFile(metadataPath, {
       ...metadata,
-      eventsWritten: events.length,
+      eventsWritten: actualEventsWritten,
       collectionPath,
       repo: `${commonRequestData.owner}/${commonRequestData.repo}`
     });
@@ -73,7 +73,7 @@ const pollEvents = async (collectionPath, commonRequestData) => {
       success: true,
       metadata: {
         ...metadata,
-        eventsWritten: events.length
+        eventsWritten: actualEventsWritten
       }
     };
   } catch (error) {
@@ -116,6 +116,8 @@ const commonRequestData = {
       } = result;
       // eslint-disable-next-line no-console
       console.log(`✅ Successfully collected ${metadata.totalEvents} events for ${REPO}`);
+      // eslint-disable-next-line no-console
+      console.log(`   ${metadata.eventsWritten} unique events written after deduplication`);
       if (metadata.rateLimitReached) {
         // eslint-disable-next-line no-console
         console.warn('⚠️ GitHub API rate limit was reached during collection');
