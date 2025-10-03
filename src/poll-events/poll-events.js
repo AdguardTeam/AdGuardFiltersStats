@@ -29,7 +29,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
 
         // Write events to collection
         await writePollToCollection(collectionPath, events);
-        await removeDupesFromCollection(collectionPath);
+        const actualEventsWritten = await removeDupesFromCollection(collectionPath);
         await removeOldFilesFromCollection(collectionPath, EVENT_EXPIRATION_DAYS);
 
         // Store metadata for diagnostics
@@ -37,7 +37,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
         const metadataPath = path.join(collectionPath, `${today}-metadata.json`);
         await writeMetadataToFile(metadataPath, {
             ...metadata,
-            eventsWritten: events.length,
+            eventsWritten: actualEventsWritten,
             collectionPath,
             repo: `${commonRequestData.owner}/${commonRequestData.repo}`,
         });
@@ -47,7 +47,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
             success: true,
             metadata: {
                 ...metadata,
-                eventsWritten: events.length,
+                eventsWritten: actualEventsWritten,
             },
         };
     } catch (error) {

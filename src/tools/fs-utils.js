@@ -129,11 +129,12 @@ const writePollToCollection = async (path, events) => {
 /**
  * Remove duplicate events from a file
  * @param {string} path path to a file
+ * @returns {Promise<number>} number of unique events after deduplication
  */
 const removeDupesFromFile = async (path) => {
     const hasFile = await pathExists(path);
     if (!hasFile) {
-        return;
+        return 0;
     }
 
     const fileEventsStream = createReadStream(path, {
@@ -155,23 +156,27 @@ const removeDupesFromFile = async (path) => {
     });
 
     await writeEventsToFile(path, dedupedArray, 'w');
+    return dedupedArray.length;
 };
 
 /**
  * Remove duplicate events from collection
  * @param {string} path path to a collection
+ * @returns {Promise<number>} number of unique events in today's file after deduplication
  */
 const removeDupesFromCollection = async (path) => {
     const hasCollection = await pathExists(path);
     if (!hasCollection) {
-        return;
+        return 0;
     }
 
     const currentDate = format(new Date(), 'yyy-MM-dd');
     const previousDate = format(endOfYesterday(), 'yyy-MM-dd');
 
-    await removeDupesFromFile(`${path}/${currentDate}${COLLECTION_FILE_EXTENSION}`);
+    const currentCount = await removeDupesFromFile(`${path}/${currentDate}${COLLECTION_FILE_EXTENSION}`);
     await removeDupesFromFile(`${path}/${previousDate}${COLLECTION_FILE_EXTENSION}`);
+
+    return currentCount;
 };
 
 /**
