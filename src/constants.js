@@ -1,15 +1,32 @@
+/**
+ * Minimum activity points required for a contributor to appear in Slack reports.
+ *
+ * Team members are always included regardless of this threshold.
+ */
 export const MIN_REQUIRED_ACTIVITY = 5;
+
+/**
+ * AdGuard filters maintainers.
+ *
+ * @see {@link https://github.com/orgs/AdguardTeam/teams/filters-maintainers}
+ */
 export const TEAM_MEMBERS = [
     'Alex-302',
     'Sergey-Lyapin',
     'AdamWr',
     'zloyden',
     'BlazDT',
-    'jellizaveta',
     'piquark6046',
     'ntnguyen1234',
 ];
-export const EXCLUDED_USERNAMES = ['adguard-bot'];
+
+/**
+ * Usernames to exclude from stats.
+ */
+export const EXCLUDED_USERNAMES = [
+    'adguard-bot',
+    'github-actions[bot]',
+];
 
 export const README_URL = 'https://github.com/AdguardTeam/AdGuardFiltersStats#github-stats-cli-app';
 
