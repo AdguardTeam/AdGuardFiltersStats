@@ -1,3 +1,8 @@
+/**
+ * Minimum activity points required for a contributor to appear in Slack reports.
+ *
+ * Team members are always included regardless of this threshold.
+ */
 export const MIN_REQUIRED_ACTIVITY = 5;
 export const TEAM_MEMBERS = [
     'Alex-302',

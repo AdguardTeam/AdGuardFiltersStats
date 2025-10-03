@@ -12,7 +12,7 @@ CLI App that polls data from GitHub REST API, stores it and gives analysis on co
 
 ## <a id="activity_count"></a> Activity count
 
-Here's what counts as activity:
+Here's what counts as activity point:
 
 * commit,
 * closed Issue (not marked as Stale),
@@ -77,6 +77,10 @@ env \
     SINCE=2022-11-21T21:00:00Z \
     github-publish
 ```
+
+> Note: team members are always included, but only contributors with activity points
+> above the `MIN_REQUIRED_ACTIVITY` threshold (defined in `src/constants.js`)
+> will appear in Slack reports.
 
 ### <a id="params"></a> Params
 
