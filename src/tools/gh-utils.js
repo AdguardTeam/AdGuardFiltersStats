@@ -83,13 +83,10 @@ export const getGithubEvents = async (commonRequestData = {}) => {
         if (error.status === 403 && error.response?.headers?.[X_RATE_LIMIT_REMAINING_HEADER] === '0') {
             rateLimitReached = true;
             rateLimitReset = parseInt(error.response.headers[X_RATE_LIMIT_RESET_HEADER], 10);
-            // eslint-disable-next-line no-console
-            console.error(`GitHub API rate limit exceeded. Limit will reset at ${new Date(rateLimitReset * 1000).toISOString()}`);
+            throw new Error(`GitHub API rate limit exceeded. Limit will reset at ${new Date(rateLimitReset * 1000).toISOString()}`);
         } else {
-            // eslint-disable-next-line no-console
-            console.error('Error fetching GitHub events:', error.message);
+            throw new Error('Error fetching GitHub events:', error.message);
         }
-        // We still return the data we've collected so far
     }
 
     // Log information about the collection
