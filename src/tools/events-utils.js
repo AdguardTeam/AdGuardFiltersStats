@@ -218,8 +218,9 @@ const getActivityAuthor = (event) => {
             // count only newly opened & merged pulls
             if (payload.action === ACTION_NAMES.OPENED
                 || (payload.action === ACTION_NAMES.CLOSED && typeof payload.pull_request.merged_at === 'string')) {
-                // merged pull request count for the one who opened it
-                contributorName = payload.pull_request.user.login;
+                // merged pull request count for the one who opened it.
+                // note: user may be deleted, so contributorName may be undefined
+                contributorName = payload.pull_request.user?.login;
             }
             break;
         }
