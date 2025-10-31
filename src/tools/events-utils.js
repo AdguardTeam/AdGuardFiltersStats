@@ -81,12 +81,12 @@ const isCreatedUntil = (event, searchTime) => {
 /**
  * Counts commits in given PushEvents
  *
- * @param {Array.<Object>} pushEvents array with PushEvents
+ * @param {Array<Object>} pushEvents array with PushEvents
  * @return {number}
  */
 const getCommitsCount = (pushEvents) => {
     const commitsCount = pushEvents.reduce((acc, event) => {
-        return acc + event.payload.commits.length;
+        return acc + (event.payload.commits?.length || 0);
     }, 0);
     return commitsCount;
 };
