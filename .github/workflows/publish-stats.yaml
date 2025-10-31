@@ -30,6 +30,8 @@ jobs:
           echo "Time range for stats collection:"
           echo "  SINCE: ${{ github.event.inputs.since }}"
           echo "  UNTIL: ${{ github.event.inputs.until }}"
+          echo "  If SINCE or UNTIL are not specified, default values will be used:"
+          echo "  e.g. for yesterday's 00:00:00 to 23:59:59"
 
       - name: Publish repo stats
         env:
