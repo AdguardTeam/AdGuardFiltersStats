@@ -86,7 +86,10 @@ const isCreatedUntil = (event, searchTime) => {
  */
 const getCommitsCount = (pushEvents) => {
     const commitsCount = pushEvents.reduce((acc, event) => {
-        return acc + (event.payload.commits?.length || 0);
+        const commitsInPush = event.payload.commits?.length;
+        // If commits array exists but is empty, or doesn't exist at all,
+        // assume 1 commit per push as a reasonable fallback
+        return acc + (commitsInPush || 1);
     }, 0);
     return commitsCount;
 };
