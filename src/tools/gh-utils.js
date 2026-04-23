@@ -127,3 +127,89 @@ export const getOpenIssues = async (commonRequestData = {}) => {
 
     return collectedPages.flat();
 };
+
+const ENDPOINT_ISSUES_LIST = 'GET /repos/{owner}/{repo}/issues';
+const ENDPOINT_PULLS_LIST = 'GET /repos/{owner}/{repo}/pulls';
+
+const inWindow = (iso, since, until) => {
+    if (!iso) return false;
+    const t = new Date(iso).getTime();
+    return t >= new Date(since).getTime() && t <= new Date(until).getTime();
+};
+
+/**
+ * List closed (true) issues whose `closed_at` falls in the time window.
+ * Filters out pull-request rows (GitHub's /issues endpoint mixes them in).
+ *
+ * @param {{owner: string, repo: string}} commonRequestData
+ * @param {{since: string, until: string}} timePeriod
+ * @returns {Promise<Array<Object>>}
+ */
+export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => {
+    const { since, until } = timePeriod;
+    const collected = [];
+    let page = 1;
+    let stop = false;
+    while (!stop) {
+        // eslint-disable-next-line no-await-in-loop
+        const { data, headers } = await octokit.request(ENDPOINT_ISSUES_LIST, {
+            ...commonRequestData,
+            state: 'closed',
+            since,
+            sort: 'updated',
+            direction: 'asc',
+            per_page: 100,
+            page,
+        });
+        // eslint-disable-next-line no-restricted-syntax
+        for (const row of data) {
+            // eslint-disable-next-line no-continue
+            if (row.pull_request) continue;
+            if (inWindow(row.closed_at, since, until)) collected.push(row);
+        }
+        const link = headers.link || '';
+        if (!link.includes('rel="next"') || data.length === 0) stop = true;
+        page += 1;
+    }
+    return collected;
+};
+
+/**
+ * List pull requests created or merged within the time window.
+ * Walks pages newest-first and stops when `updated_at` falls strictly
+ * before `since` (no further matches possible).
+ */
+export const getPullsInWindow = async (commonRequestData, timePeriod) => {
+    const { since, until } = timePeriod;
+    const sinceMs = new Date(since).getTime();
+    const collected = [];
+    let page = 1;
+    let stop = false;
+    while (!stop) {
+        // eslint-disable-next-line no-await-in-loop
+        const { data, headers } = await octokit.request(ENDPOINT_PULLS_LIST, {
+            ...commonRequestData,
+            state: 'all',
+            sort: 'updated',
+            direction: 'desc',
+            per_page: 100,
+            page,
+        });
+        // eslint-disable-next-line no-restricted-syntax
+        for (const pr of data) {
+            const updatedMs = new Date(pr.updated_at).getTime();
+            if (updatedMs < sinceMs) {
+                stop = true;
+                // eslint-disable-next-line no-continue
+                continue;
+            }
+            const openedIn = inWindow(pr.created_at, since, until);
+            const mergedIn = pr.merged_at && inWindow(pr.merged_at, since, until);
+            if (openedIn || mergedIn) collected.push(pr);
+        }
+        const link = headers.link || '';
+        if (!link.includes('rel="next"') || data.length === 0) stop = true;
+        page += 1;
+    }
+    return collected;
+};

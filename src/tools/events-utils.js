@@ -115,7 +115,7 @@ const countEventsByType = (contributor, eventType) => {
         const mergedPullsCount = contributor
             .events
             .PullRequestEvent
-            .filter((event) => !isMerged(event))
+            .filter((event) => isMerged(event))
             .length;
         return mergedPullsCount;
     }

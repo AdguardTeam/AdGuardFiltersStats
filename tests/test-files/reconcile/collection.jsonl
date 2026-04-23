@@ -1,0 +1,2 @@
+{"id":"live-1","type":"IssuesEvent","created_at":"2026-04-21T05:00:00Z","actor":{"login":"alice"},"payload":{"action":"opened","issue":{"labels":[]}}}
+{"id":"live-2","type":"PushEvent","created_at":"2026-04-21T07:00:00Z","actor":{"login":"AdamWr"},"payload":{"commits":[{"sha":"a"},{"sha":"b"}]}}

@@ -22,6 +22,19 @@ Here's what counts as activity point:
 
 Examples of Github Actions for these scripts can be found in `examples` folder.
 
+### <a id="stats_accuracy"></a> Stats accuracy
+
+`github-publish` performs a **publish-time reconciliation** against the
+GitHub REST API for the requested window. This recovers issue closures
+and PR open/merge events that were missed by the Events-API poller
+(the Events API only retains the 300 most recent public events). When
+the REST API is unavailable the publisher emits a warning; if the
+window is also empty in the local collection it exits non-zero rather
+than producing an under-reported message.
+
+Per-poll diagnostics are appended to `<date>-metadata.json` (one
+record per poll) so polling gaps can be analyzed after the fact.
+
 ## <a id="how-to-install"></a> How to install
 
 ```bash
