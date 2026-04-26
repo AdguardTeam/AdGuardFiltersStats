@@ -2,10 +2,10 @@
   "totalEvents": 298,
   "pagesCollected": 10,
   "rateLimitReached": false,
-  "rateLimitRemaining": 4982,
-  "rateLimitReset": "2026-04-26T22:46:33.000Z",
-  "timestamp": "2026-04-26T22:14:21.839Z",
-  "eventsWritten": 207,
+  "rateLimitRemaining": 4990,
+  "rateLimitReset": "2026-04-26T23:46:37.000Z",
+  "timestamp": "2026-04-26T22:46:43.860Z",
+  "eventsWritten": 211,
   "collectionPath": "./stats-data",
   "repo": "AdguardTeam/AdguardFilters"
 }
