@@ -6,7 +6,7 @@ import {
     removeOldFilesFromCollection,
     writePollToCollection,
     removeDupesFromCollection,
-    writeMetadataToFile,
+    appendMetadataRecord,
 } from '../tools/fs-utils';
 
 /**
@@ -32,12 +32,19 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
         const actualEventsWritten = await removeDupesFromCollection(collectionPath);
         await removeOldFilesFromCollection(collectionPath, EVENT_EXPIRATION_DAYS);
 
-        // Store metadata for diagnostics
+        // Store metadata for diagnostics (one record per poll, append-only)
         const today = format(new Date(), 'yyyy-MM-dd');
         const metadataPath = path.join(collectionPath, `${today}-metadata.json`);
-        await writeMetadataToFile(metadataPath, {
-            ...metadata,
+        await appendMetadataRecord(metadataPath, {
+            timestamp: metadata.timestamp,
+            totalEvents: metadata.totalEvents,
+            pagesCollected: metadata.pagesCollected,
             eventsWritten: actualEventsWritten,
+            rateLimitRemaining: metadata.rateLimitRemaining,
+            rateLimitReached: metadata.rateLimitReached,
+            rateLimitReset: metadata.rateLimitReset,
+            gapSuspected: false,
+            error: null,
             collectionPath,
             repo: `${commonRequestData.owner}/${commonRequestData.repo}`,
         });
@@ -51,6 +58,25 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
             },
         };
     } catch (error) {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        try {
+            await appendMetadataRecord(
+                path.join(collectionPath, `${today}-metadata.json`),
+                {
+                    timestamp: new Date().toISOString(),
+                    totalEvents: 0,
+                    pagesCollected: 0,
+                    eventsWritten: 0,
+                    rateLimitRemaining: null,
+                    rateLimitReached: false,
+                    rateLimitReset: null,
+                    gapSuspected: false,
+                    error: error.message,
+                    collectionPath,
+                    repo: `${commonRequestData.owner}/${commonRequestData.repo}`,
+                },
+            );
+        } catch (_) { /* swallow secondary IO error */ }
         // eslint-disable-next-line no-console
         console.error('Error in pollEvents:', error.message);
         // Return failure status and error information

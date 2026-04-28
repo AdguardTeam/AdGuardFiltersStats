@@ -1,0 +1,23 @@
+[
+  {
+    "id": 4001,
+    "number": 229107,
+    "closed_at": "2026-04-21T06:31:14Z",
+    "closed_by": { "id": 100, "login": "user1" },
+    "labels": [{ "name": "T: Ads" }, { "name": "A: Cannot reproduce" }]
+  },
+  {
+    "id": 4002,
+    "number": 229200,
+    "closed_at": "2026-04-21T08:00:00Z",
+    "closed_by": { "id": 100, "login": "user1" },
+    "labels": [{ "name": "Stale" }]
+  },
+  {
+    "id": 4003,
+    "number": 229300,
+    "closed_at": "2026-04-21T09:00:00Z",
+    "closed_by": null,
+    "labels": []
+  }
+]
