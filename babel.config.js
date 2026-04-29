@@ -4,7 +4,7 @@ export default {
             '@babel/preset-env',
             {
                 targets: {
-                    node: '22.14.0',
+                    node: '22.17.0',
                 },
             },
         ],
