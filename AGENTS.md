@@ -44,13 +44,12 @@ It is intended to be invoked from CI (e.g. GitHub Actions — see
 ## Technical Context
 
 - **Language/Version**: JavaScript (ES Modules in `src/`, transpiled by Babel,
-  bundled to CommonJS in `bin/`). No `engines` field is declared; targets
-  modern Node.js (Node 18+ recommended for built-in `fetch`/`AbortController`,
-  though the project does not currently rely on them).
+  bundled to CommonJS in `bin/`). Targets modern Node.js (Node 22.17.0+,
+  enforced via the `engines` field in `package.json`).
 - **Primary Dependencies**: `@octokit/core` (GitHub REST), `@slack/web-api`
-  (Slack publishing), `date-fns` (date math), `fs-extra` (filesystem),
+  (Slack publishing), `date-fns` (date math),
   `lodash` (utilities), `stream-json` / `stream-chain` (streaming JSONL
-  parsing), `dotenv` (env loading), `node-fetch@2`.
+  parsing), `dotenv` (env loading).
 - **Storage**: Local filesystem. Events are written as one JSONL file per day
   (`YYYY-MM-DD.jsonl`) plus a `YYYY-MM-DD-metadata.json` sidecar under the
   directory pointed to by `COLLECTION_PATH` (e.g. [stats-data/](./stats-data/)).
@@ -226,7 +225,7 @@ Universal principles the codebase follows:
   rate-limit warnings to stdout/stderr. New long-running steps SHOULD
   log similarly via `console.log` / `console.warn`.
 - **Keep It Boring** — prefer well-understood Node patterns
-  (`async/await`, `fs-extra`, plain objects) over clever or novel
+  (`async/await`, plain objects) over clever or novel
   solutions.
 
 This project follows a layered architecture. From top (entry) to bottom
@@ -296,7 +295,7 @@ need shared logic, lift it into `src/tools/` or `src/publish-utils/`.
 - **What to test**: Focus on pure functions in `prepare-stats/` and
   `publish-utils/format-utils/` — they have well-defined inputs/outputs
   and no I/O. Network and filesystem boundaries (`@octokit/core`,
-  `@slack/web-api`, `fs-extra`) SHOULD be mocked with `jest.mock` rather
+  `@slack/web-api`) SHOULD be mocked with `jest.mock` rather
   than hit live.
 - **Coverage**: No formal threshold is enforced. New behavior MUST come
   with at least one test that exercises the success path and one for any
@@ -329,15 +328,8 @@ vulnerabilities, supply-chain risks, and long-term maintenance cost.
 
 **Known exclusions** (to be fixed):
 
-- All entries in `package.json` use caret ranges (`^x.y.z`) instead of
-  exact versions.
-- `any-promise` is unused-looking and predates native `Promise`; it
-  SHOULD be removed if no transitive consumer requires it.
-- `node-fetch@2` can be replaced by global `fetch` on Node 18+.
 - `lodash` is largely replaceable with built-in language features for the
   small set of helpers actually used; consider migrating.
-- `fs-extra` is mostly replaceable with `node:fs/promises`; new code
-  SHOULD prefer the built-in module.
 
 ### Configuration & Documentation
 
@@ -346,7 +338,7 @@ vulnerabilities, supply-chain risks, and long-term maintenance cost.
   in [src/](./src/). The supported variables are:
   `COLLECTION_PATH`, `GITHUB_TOKEN`, `REPO`, `SINCE`, `UNTIL`,
   `SLACK_OAUTH_TOKEN`, `SLACK_CHANNEL_ID`. See
-  [README.md#params](./README.md#params) for semantics.
+  [README.md#configuration](./README.md#configuration) for semantics.
 - **Local overrides**: A `.env` file in the repo root is loaded at
   startup. `.env` is gitignored; commit changes to
   [.env-example](./.env-example) instead so contributors can copy it.

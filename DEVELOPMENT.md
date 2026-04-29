@@ -40,12 +40,9 @@ rules, and AI agent guidance, see [AGENTS.md](./AGENTS.md).
 
 Install the following tools before you start:
 
-- **Node.js 18.x or newer** — required by the runtime; the codebase uses
-  ES Modules in `src/` and Rollup-bundled CommonJS in `bin/`. Node 18+
-  is the lowest version that ships built-in `fetch` and
-  `AbortController`, which keeps the door open for replacing
-  `node-fetch@2`.
-- **Yarn 1.x (Classic)** — the committed lockfile is `yarn.lock` and
+- **Node.js 22.17.0 or newer** — required by the runtime; the codebase uses
+  ES Modules in `src/` and Rollup-bundled CommonJS in `bin/`.
+- **Yarn 1.22.x (Classic)** — the committed lockfile is `yarn.lock` and
   every workflow under [.github/workflows/](./.github/workflows/) calls
   `yarn install` and `yarn build`. Yarn 2+ (Berry) is not supported.
 - **Git** — any recent version.
@@ -55,11 +52,9 @@ Install the following tools before you start:
 - A **Slack bot token** (`xoxb-...`) and target channel id, only if you
   want to exercise `github-publish` locally.
 
-Optional but recommended:
+Recommended Editor:
 
-- An editor with ESLint integration (VS Code with the ESLint extension
-  works out of the box; no Prettier or TypeScript is configured for
-  this repo).
+- **VS Code** with the **ESLint** extension.
 
 ## Getting Started
 
@@ -91,17 +86,17 @@ cp .env-example .env
 `.env` is gitignored. The file is loaded by `dotenv` at the top of each
 CLI entry script in [src/](./src/).
 
-Supported variables:
+The supported variables are:
 
-| Variable            | Required for                  | Description                                                                  |
-| ------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
-| `COLLECTION_PATH`   | `poll`, `stats`, `publish`    | Directory where daily JSONL event files and metadata sidecars are stored.    |
-| `REPO`              | `poll`, `stats`, `publish`    | Target repository in `{owner}/{repo_name}` form.                             |
-| `GITHUB_TOKEN`      | `poll` (recommended), `stats` | GitHub PAT. Without it, requests are limited to 60/hour.                     |
-| `SINCE`             | `stats`, `publish`            | ISO 8601 timestamp (`YYYY-MM-DDTHH:MM:SSZ`). Lower bound of the stat window. |
-| `UNTIL`             | `stats`, `publish`            | ISO 8601 timestamp. Upper bound of the stat window. Defaults to now.         |
-| `SLACK_OAUTH_TOKEN` | `publish`                     | Slack bot token (`xoxb-...`).                                                |
-| `SLACK_CHANNEL_ID`  | `publish`                     | Slack channel id to post to.                                                 |
+| Variable            | Required for                             | Description                                                                  |
+| ------------------- | ---------------------------------------- | ---------------------------------------------------------------------------- |
+| `COLLECTION_PATH`   | `poll`, `stats`, `publish`               | Directory where daily JSONL event files and metadata sidecars are stored.    |
+| `REPO`              | `poll`, `stats`, `publish`               | Target repository in `{owner}/{repo_name}` form.                             |
+| `GITHUB_TOKEN`      | `poll` (recommended), `stats`, `publish` | GitHub PAT. Without it, requests are limited to 60/hour.                     |
+| `SINCE`             | `stats`, `publish`                       | ISO 8601 timestamp (`YYYY-MM-DDTHH:MM:SSZ`). Lower bound of the stat window. |
+| `UNTIL`             | `stats`, `publish`                       | ISO 8601 timestamp. Upper bound of the stat window. Defaults to now.         |
+| `SLACK_OAUTH_TOKEN` | `publish`                                | Slack bot token (`xoxb-...`).                                                |
+| `SLACK_CHANNEL_ID`  | `publish`                                | Slack channel id to post to.                                                 |
 
 When you add a new variable, also update [.env-example](./.env-example)
 and the relevant section in [README.md](./README.md).
@@ -148,11 +143,11 @@ described above.
 - Keep changes focused; one logical change per PR.
 - Match the existing commit message style (short imperative subject).
 - Before opening a PR:
-    - run `yarn lint`
-    - run `yarn test`
-    - run `yarn build` and commit the regenerated `bin/` artifacts if
-      any source under `src/` changed
-    - update [README.md](./README.md), [.env-example](./.env-example),
+    - Run `yarn lint` to check for code style issues.
+    - Run `yarn test` to ensure all tests pass.
+    - Run `yarn build` and commit the regenerated `bin/` artifacts if
+      any source under `src/` changed.
+    - Update [README.md](./README.md), [.env-example](./.env-example),
       [examples/](./examples/), [AGENTS.md](./AGENTS.md), and
       [CHANGELOG.md](./CHANGELOG.md) when relevant (see the
       "Configuration & Documentation" section in
@@ -210,7 +205,7 @@ yarn test --watch
 
 Focus testing on pure functions in `src/prepare-stats/` and
 `src/publish-utils/format-utils/`. Mock network and filesystem
-boundaries (`@octokit/core`, `@slack/web-api`, `fs-extra`) with
+boundaries (`@octokit/core`, `@slack/web-api`) with
 `jest.mock` rather than hitting them live. New behavior MUST come with
 at least one success-path test and one failure-path test.
 
@@ -305,7 +300,7 @@ regressed.
    [src/](./src/), validating it and exiting non-zero on missing
    required values.
 2. Add it to [.env-example](./.env-example) with a placeholder value.
-3. Document it in [README.md](./README.md#params) and in the table in
+3. Document it in [README.md](./README.md#configuration) and in the table in
    [Step 3](#3-configure-environment-variables) of this guide.
 4. Update [examples/](./examples/) workflows if the new variable is
    needed in CI.
@@ -409,12 +404,7 @@ input.
 
 ## Additional Resources
 
-- [README.md](./README.md) — user-facing usage and install instructions
-- [AGENTS.md](./AGENTS.md) — code guidelines, architecture, and
-  contribution rules
-- [CHANGELOG.md](./CHANGELOG.md) — user-visible changes
-- [examples/](./examples/) — sample GitHub Actions workflows
-- [.github/workflows/](./.github/workflows/) — production CI workflows
-- [GitHub REST API — Events](https://docs.github.com/en/rest/activity/events)
-- [Slack Web API — `chat.postMessage`](https://api.slack.com/methods/chat.postMessage)
+- [GitHub Events API documentation](https://docs.github.com/en/rest/activity/events)
 - [Slack Block Kit Builder](https://app.slack.com/block-kit-builder)
+- [Jest documentation](https://jestjs.io/docs/getting-started)
+- [Rollup documentation](https://rollupjs.org/guide/en/)

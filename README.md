@@ -138,7 +138,7 @@ github-publish
 
 Required variables: `COLLECTION_PATH`, `REPO`, `SLACK_OAUTH_TOKEN`,
 `SLACK_CHANNEL_ID`.
-Optional variables: `SINCE`, `UNTIL`.
+Optional variables: `SINCE`, `UNTIL`, `GITHUB_TOKEN`.
 
 Posts the same statistics as `github-stats` to the configured Slack
 channel. Team members are always included; external contributors only
@@ -156,7 +156,7 @@ entries load a `.env` file from the working directory if one exists.
 | ----------------- | ----------------------------- | ------------------------------------------------------------------------------------------ |
 | `COLLECTION_PATH` | All commands                  | Directory for daily JSONL files and metadata sidecars.                                     |
 | `REPO`            | All commands                  | Target repository in `owner/repo_name` form.                                               |
-| `GITHUB_TOKEN`    | `poll` (recommended), `stats` | GitHub Personal Access Token. Raises the API rate limit from 60 to 5000 requests per hour. |
+| `GITHUB_TOKEN`    | `poll` (recommended), `stats`, `publish` | GitHub Personal Access Token. Raises the API rate limit from 60 to 5000 requests per hour. |
 | `SINCE`           | `stats`, `publish`            | Lower bound of the time window (ISO 8601). All stored events are used if omitted.          |
 | `UNTIL`           | `stats`, `publish`            | Upper bound of the time window (ISO 8601). Defaults to now if omitted.                     |
 
