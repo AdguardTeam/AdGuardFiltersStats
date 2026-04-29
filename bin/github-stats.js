@@ -2,12 +2,11 @@
 'use strict';
 
 var dotenv = require('dotenv');
-var prepareStats = require('./prepare-stats-4K8Lw0gJ.js');
+var prepareStats = require('./prepare-stats-C5dIYjKe.js');
 var dateFns = require('date-fns');
-require('./fs-utils-BHVua_9Q.js');
+require('./fs-utils-DxFsNDOK.js');
 require('@octokit/core');
-require('node:fs');
-require('node:fs/promises');
+require('fs-extra');
 require('stream');
 require('stream-chain');
 require('string_decoder');
