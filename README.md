@@ -106,16 +106,16 @@ removes duplicates already present in today's JSONL file, and appends
 new ones. The metadata sidecar is updated in place. Re-running on the
 same day is safe and idempotent.
 
-**Metadata fields**
+#### Metadata fields
 
-| Field | Description |
-| --- | --- |
-| `totalEvents` | Events fetched from GitHub API |
-| `eventsWritten` | Unique events written after deduplication |
-| `pagesCollected` | Number of API pages processed |
-| `rateLimitReached` | Whether the API rate limit was hit |
-| `rateLimitRemaining` | Remaining API requests |
-| `rateLimitReset` | Timestamp when the rate limit resets |
+| Field                | Description                               |
+| -------------------- | ----------------------------------------- |
+| `totalEvents`        | Events fetched from GitHub API            |
+| `eventsWritten`      | Unique events written after deduplication |
+| `pagesCollected`     | Number of API pages processed             |
+| `rateLimitReached`   | Whether the API rate limit was hit        |
+| `rateLimitRemaining` | Remaining API requests                    |
+| `rateLimitReset`     | Timestamp when the rate limit resets      |
 
 ### Print stats in console
 
@@ -152,20 +152,20 @@ entries load a `.env` file from the working directory if one exists.
 
 ### Common variables
 
-| Variable | Required for | Description |
-| --- | --- | --- |
-| `COLLECTION_PATH` | All commands | Directory for daily JSONL files and metadata sidecars. |
-| `REPO` | All commands | Target repository in `owner/repo_name` form. |
-| `GITHUB_TOKEN` | `poll` (recommended), `stats` | GitHub Personal Access Token. Raises the API rate limit from 60 to 5000 requests per hour. |
-| `SINCE` | `stats`, `publish` | Lower bound of the time window (ISO 8601). All stored events are used if omitted. |
-| `UNTIL` | `stats`, `publish` | Upper bound of the time window (ISO 8601). Defaults to now if omitted. |
+| Variable          | Required for                  | Description                                                                                |
+| ----------------- | ----------------------------- | ------------------------------------------------------------------------------------------ |
+| `COLLECTION_PATH` | All commands                  | Directory for daily JSONL files and metadata sidecars.                                     |
+| `REPO`            | All commands                  | Target repository in `owner/repo_name` form.                                               |
+| `GITHUB_TOKEN`    | `poll` (recommended), `stats` | GitHub Personal Access Token. Raises the API rate limit from 60 to 5000 requests per hour. |
+| `SINCE`           | `stats`, `publish`            | Lower bound of the time window (ISO 8601). All stored events are used if omitted.          |
+| `UNTIL`           | `stats`, `publish`            | Upper bound of the time window (ISO 8601). Defaults to now if omitted.                     |
 
 ### Publishing variables
 
-| Variable | Required for | Description |
-| --- | --- | --- |
-| `SLACK_OAUTH_TOKEN` | `publish` | Slack bot token (`xoxb-...`). |
-| `SLACK_CHANNEL_ID` | `publish` | Slack channel ID to post messages to. |
+| Variable            | Required for | Description                           |
+| ------------------- | ------------ | ------------------------------------- |
+| `SLACK_OAUTH_TOKEN` | `publish`    | Slack bot token (`xoxb-...`).         |
+| `SLACK_CHANNEL_ID`  | `publish`    | Slack channel ID to post messages to. |
 
 ## Scheduling with GitHub Actions
 
