@@ -3,11 +3,12 @@
 
 var dotenv = require('dotenv');
 var dateFns = require('date-fns');
-var prepareStats = require('./prepare-stats-C5dIYjKe.js');
-var fsUtils = require('./fs-utils-DxFsNDOK.js');
+var prepareStats = require('./prepare-stats-4K8Lw0gJ.js');
+var fsUtils = require('./fs-utils-BHVua_9Q.js');
 var webApi = require('@slack/web-api');
 require('@octokit/core');
-require('fs-extra');
+require('node:fs');
+require('node:fs/promises');
 require('stream');
 require('stream-chain');
 require('string_decoder');

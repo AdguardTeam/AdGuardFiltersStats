@@ -1,12 +1,11 @@
+import { createWriteStream, createReadStream } from 'node:fs';
 import {
-    createWriteStream,
-    createReadStream,
-    pathExists,
-    remove,
+    access,
+    unlink,
     readdir,
-    ensureDir,
+    mkdir,
     writeFile,
-} from 'fs-extra';
+} from 'node:fs/promises';
 import {
     format,
     endOfYesterday,
@@ -23,6 +22,22 @@ import {
     sortEventsByDate,
 } from './events-utils';
 import { MILLISECONDS_IN_DAY, COLLECTION_FILE_EXTENSION } from '../constants';
+
+/**
+ * Check if path exists.
+ *
+ * @param {string} path Path to check.
+ *
+ * @returns {Promise<boolean>} True if path exists.
+ */
+const pathExists = async (path) => {
+    try {
+        await access(path);
+        return true;
+    } catch {
+        return false;
+    }
+};
 
 /**
  * Gets array of GitHub event objects from file and by timePeriod
@@ -118,7 +133,7 @@ const writeEventsToFile = async (path, events, flag) => {
  * @param {Array<Object>} events array with GitHub event objects
  */
 const writePollToCollection = async (path, events) => {
-    await ensureDir(path);
+    await mkdir(path, { recursive: true });
     const sortedPoll = sortEventsByDate(events);
 
     await Promise.all(Object.keys(sortedPoll).map((date) => {
@@ -194,10 +209,9 @@ const removeOldFilesFromCollection = async (path, expirationDays) => {
         return Date.now() - daysOld > expirationTime;
     });
 
-    oldFilenames.forEach(async (filename) => {
-        // eslint-disable-next-line no-await-in-loop
-        await remove(`${path}/${filename}`);
-    });
+    await Promise.all(oldFilenames.map((filename) => {
+        return unlink(`${path}/${filename}`);
+    }));
 };
 
 /**
@@ -207,7 +221,7 @@ const removeOldFilesFromCollection = async (path, expirationDays) => {
  * @param {Object} metadata Metadata to write.
  */
 const writeMetadataToFile = async (path, metadata) => {
-    await ensureDir(path.substring(0, path.lastIndexOf('/')));
+    await mkdir(path.substring(0, path.lastIndexOf('/')), { recursive: true });
     const metadataJson = JSON.stringify(metadata, null, 2);
     await writeFile(path, metadataJson);
 };
