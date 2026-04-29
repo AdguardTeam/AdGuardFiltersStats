@@ -49,7 +49,7 @@ deduplication, and rate-limit status.
 `github-stats` and `github-publish` operate on a time window defined by
 `SINCE` and `UNTIL`. If `SINCE` is omitted, all stored events are used.
 If `UNTIL` is omitted, the current time is used. Daily files older than
-30 days are automatically pruned during stat preparation.
+30 days are automatically pruned during `github-poll`.
 
 ## <a id="how-to-install"></a> Installation
 
