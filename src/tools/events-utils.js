@@ -3,6 +3,7 @@ import {
     EVENT_TYPES,
     LABEL_NAMES,
     ACTION_NAMES,
+    EXCLUDED_USERNAMES,
 } from '../constants';
 
 /**
@@ -229,6 +230,10 @@ const getActivityAuthor = (event) => {
         }
         default:
             break;
+    }
+
+    if (contributorName && EXCLUDED_USERNAMES.includes(contributorName)) {
+        return undefined;
     }
 
     return contributorName;

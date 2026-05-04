@@ -64,3 +64,26 @@ describe('getActivityAuthor — null/deleted actor', () => {
         expect(getActivityAuthor(event)).toBeUndefined();
     });
 });
+
+describe('getActivityAuthor — EXCLUDED_USERNAMES', () => {
+    it('returns undefined for a push event from adguard-bot', () => {
+        const event = {
+            type: EVENT_TYPES.PUSH_EVENT,
+            actor: { login: 'adguard-bot' },
+            payload: { commits: [{ sha: 'abc' }] },
+        };
+        expect(getActivityAuthor(event)).toBeUndefined();
+    });
+
+    it('returns undefined for a closed-issue event from github-actions[bot]', () => {
+        const event = {
+            type: EVENT_TYPES.ISSUES_EVENT,
+            actor: { login: 'github-actions[bot]' },
+            payload: {
+                action: 'closed',
+                issue: { labels: [] },
+            },
+        };
+        expect(getActivityAuthor(event)).toBeUndefined();
+    });
+});

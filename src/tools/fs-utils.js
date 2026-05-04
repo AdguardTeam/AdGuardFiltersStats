@@ -237,7 +237,7 @@ const writeMetadataToFile = async (path, metadata) => {
  * @param {Object} record    metadata record (see PollMetadataRecord)
  */
 const appendMetadataRecord = async (filePath, record) => {
-    await ensureDir(filePath.substring(0, filePath.lastIndexOf('/')));
+    await mkdir(filePath.substring(0, filePath.lastIndexOf('/')), { recursive: true });
     let existing = [];
     if (await pathExists(filePath)) {
         const raw = await readFile(filePath, 'utf8');
@@ -257,7 +257,7 @@ const appendMetadataRecord = async (filePath, record) => {
  */
 const mergeSyntheticEventsIntoCollection = async (collectionPath, events) => {
     if (!events || events.length === 0) return;
-    await ensureDir(collectionPath);
+    await mkdir(collectionPath, { recursive: true });
     const sorted = sortEventsByDate(events);
     await Promise.all(Object.keys(sorted).map((date) => writeEventsToFile(
         `${collectionPath}/${date}${COLLECTION_FILE_EXTENSION}`,
@@ -269,6 +269,25 @@ const mergeSyntheticEventsIntoCollection = async (collectionPath, events) => {
     )));
 };
 
+/**
+ * Read all metadata records from a per-day JSON file.
+ * Returns an empty array if the file does not exist.
+ * Migrates legacy single-object files to an array on read.
+ *
+ * @param {string} filePath Per-day metadata file path.
+ * @returns {Promise<Array<Object>>} Array of metadata records (see PollMetadataRecord).
+ */
+const readMetadataRecords = async (filePath) => {
+    if (!(await pathExists(filePath))) {
+        return [];
+    }
+
+    const raw = await readFile(filePath, 'utf8');
+    const parsed = JSON.parse(raw);
+
+    return Array.isArray(parsed) ? parsed : [parsed];
+};
+
 export {
     getEventsFromCollection,
     writePollToCollection,
@@ -277,4 +296,5 @@ export {
     writeMetadataToFile,
     appendMetadataRecord,
     mergeSyntheticEventsIntoCollection,
+    readMetadataRecords,
 };

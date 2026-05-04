@@ -1,12 +1,15 @@
 import path from 'path';
 import { format } from 'date-fns';
 import { getGithubEvents } from '../tools/gh-utils';
-import { EVENT_EXPIRATION_DAYS } from '../constants';
+import { reconcileWindow } from '../tools/reconcile';
+import { EVENT_EXPIRATION_DAYS, POLL_GAP_THRESHOLD_MS } from '../constants';
 import {
     removeOldFilesFromCollection,
     writePollToCollection,
     removeDupesFromCollection,
     appendMetadataRecord,
+    readMetadataRecords,
+    mergeSyntheticEventsIntoCollection,
 } from '../tools/fs-utils';
 
 /**
@@ -32,9 +35,47 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
         const actualEventsWritten = await removeDupesFromCollection(collectionPath);
         await removeOldFilesFromCollection(collectionPath, EVENT_EXPIRATION_DAYS);
 
-        // Store metadata for diagnostics (one record per poll, append-only)
+        // Compute event time bounds for gap detection and diagnostics
+        const eventTimes = events.map((e) => new Date(e.created_at).getTime());
+        const oldestEventAt = new Date(Math.min(...eventTimes)).toISOString();
+        const newestEventAt = new Date(Math.max(...eventTimes)).toISOString();
+
+        // Read previous metadata to detect gap
         const today = format(new Date(), 'yyyy-MM-dd');
         const metadataPath = path.join(collectionPath, `${today}-metadata.json`);
+        const prevRecords = await readMetadataRecords(metadataPath);
+        const lastSuccessful = prevRecords.filter((r) => !r.error).at(-1);
+
+        let gapSuspected = false;
+        let gapWindowSince = null;
+        if (lastSuccessful) {
+            const msSinceLast = Date.now() - new Date(lastSuccessful.timestamp).getTime();
+            const oldestEventTime = new Date(oldestEventAt).getTime();
+            const lastEventTime = new Date(lastSuccessful.newestEventAt).getTime();
+            const eventBasedGap = lastSuccessful.newestEventAt
+                && (oldestEventTime - lastEventTime) > POLL_GAP_THRESHOLD_MS;
+            if (msSinceLast > POLL_GAP_THRESHOLD_MS || eventBasedGap) {
+                gapSuspected = true;
+                gapWindowSince = lastSuccessful.newestEventAt || lastSuccessful.timestamp;
+            }
+        }
+
+        // Backfill gap window from REST when a gap is detected
+        if (gapSuspected && gapWindowSince) {
+            const gapWindow = { since: gapWindowSince, until: oldestEventAt };
+            const repoMeta = { id: 0, name: `${commonRequestData.owner}/${commonRequestData.repo}` };
+            // eslint-disable-next-line function-paren-newline
+            const { injectedEvents, error: backfillError } = await reconcileWindow(
+                commonRequestData, gapWindow, repoMeta);
+            if (backfillError) {
+                // eslint-disable-next-line no-console
+                console.warn(`⚠️ Gap detected but backfill failed: ${backfillError}`);
+            } else if (injectedEvents.length > 0) {
+                await mergeSyntheticEventsIntoCollection(collectionPath, injectedEvents);
+            }
+        }
+
+        // Store metadata for diagnostics (one record per poll, append-only)
         await appendMetadataRecord(metadataPath, {
             timestamp: metadata.timestamp,
             totalEvents: metadata.totalEvents,
@@ -43,7 +84,9 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
             rateLimitRemaining: metadata.rateLimitRemaining,
             rateLimitReached: metadata.rateLimitReached,
             rateLimitReset: metadata.rateLimitReset,
-            gapSuspected: false,
+            oldestEventAt,
+            newestEventAt,
+            gapSuspected,
             error: null,
             collectionPath,
             repo: `${commonRequestData.owner}/${commonRequestData.repo}`,
@@ -70,6 +113,8 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
                     rateLimitRemaining: null,
                     rateLimitReached: false,
                     rateLimitReset: null,
+                    oldestEventAt: null,
+                    newestEventAt: null,
                     gapSuspected: false,
                     error: error.message,
                     collectionPath,

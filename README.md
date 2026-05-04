@@ -121,14 +121,23 @@ same day is safe and idempotent.
 
 #### Metadata fields
 
-| Field                | Description                               |
-| -------------------- | ----------------------------------------- |
-| `totalEvents`        | Events fetched from GitHub API            |
-| `eventsWritten`      | Unique events written after deduplication |
-| `pagesCollected`     | Number of API pages processed             |
-| `rateLimitReached`   | Whether the API rate limit was hit        |
-| `rateLimitRemaining` | Remaining API requests                    |
-| `rateLimitReset`     | Timestamp when the rate limit resets      |
+The `YYYY-MM-DD-metadata.json` sidecar contains a JSON **array** of records, one per
+poll run. (Legacy files written as a single object are automatically migrated to an array
+on the next poll.)
+
+| Field                | Description                                                           |
+| -------------------- | --------------------------------------------------------------------- |
+| `timestamp`          | ISO 8601 time when this poll ran                                      |
+| `totalEvents`        | Events fetched from GitHub API                                        |
+| `eventsWritten`      | Unique events written after deduplication                             |
+| `pagesCollected`     | Number of API pages processed                                         |
+| `rateLimitReached`   | Whether the API rate limit was hit                                    |
+| `rateLimitRemaining` | Remaining API requests at poll time                                   |
+| `rateLimitReset`     | ISO 8601 timestamp when the rate limit resets                         |
+| `oldestEventAt`      | `created_at` of the oldest event returned by this poll                |
+| `newestEventAt`      | `created_at` of the newest event returned by this poll                |
+| `gapSuspected`       | `true` if no successful poll for >90 min or event window gap detected |
+| `error`              | Error message if the poll failed, otherwise `null`                    |
 
 ### Print stats in console
 
