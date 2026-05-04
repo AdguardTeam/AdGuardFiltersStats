@@ -11,8 +11,8 @@ jobs:
   poll:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 16
       - name: Install package
