@@ -4,9 +4,10 @@
 var dotenv = require('dotenv');
 var dateFns = require('date-fns');
 var path = require('path');
-var fsUtils = require('./fs-utils-DxFsNDOK.js');
+var fsUtils = require('./fs-utils-BKOqaAdC.js');
 require('@octokit/core');
-require('fs-extra');
+require('node:fs');
+require('node:fs/promises');
 require('stream');
 require('stream-chain');
 require('string_decoder');

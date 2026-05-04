@@ -1,7 +1,7 @@
 name: Poll events (manually)
 
 env:
-  NODE_VERSION: 22.14.0
+  NODE_VERSION: 22.17.0
 
 on: workflow_dispatch
 
@@ -13,10 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js environment
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
 
