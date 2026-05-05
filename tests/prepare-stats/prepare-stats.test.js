@@ -26,7 +26,7 @@ jest.mock('../../src/tools/gh-utils', () => {
 import { prepareStats } from '../../src/prepare-stats';
 
 describe('prepareStats — reconciles missing closures from REST', () => {
-    it('counts a zloyden resolved issue that was missing from the JSONL', async () => {
+    it('counts a user1 resolved issue that was missing from the JSONL', async () => {
         const dir = await mkdtemp(path.join(tmpdir(), 'stats-'));
         await copyFile(
             path.join(__dirname, '..', 'test-files', 'reconcile', 'collection.jsonl'),

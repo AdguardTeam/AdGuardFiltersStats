@@ -147,7 +147,6 @@ const inWindow = (iso, since, until) => {
  */
 export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => {
     const { since, until } = timePeriod;
-    const untilMs = new Date(until).getTime();
     const collected = [];
     let page = 1;
     let stop = false;
@@ -166,12 +165,9 @@ export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => 
         for (const row of data) {
             // eslint-disable-next-line no-continue
             if (row.pull_request) continue;
-            // Results are sorted ascending by updated_at; once we exceed until
-            // all subsequent rows are also out of range.
-            if (new Date(row.updated_at).getTime() > untilMs) {
-                stop = true;
-                break;
-            }
+            // Do not short-circuit on updated_at > until: an issue can have
+            // closed_at inside the window but updated_at later (e.g. a comment
+            // was added after the window closed), so we must scan all pages.
             if (inWindow(row.closed_at, since, until)) collected.push(row);
         }
         const link = headers.link || '';

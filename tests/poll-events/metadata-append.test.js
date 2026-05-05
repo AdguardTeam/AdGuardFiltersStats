@@ -47,6 +47,13 @@ describe('appendMetadataRecord', () => {
         const parsed = JSON.parse(await readFile(file, 'utf8'));
         expect(parsed).toEqual([{ legacy: true }, recA]);
     });
+
+    it('treats a corrupted file as empty and writes a one-element array', async () => {
+        await writeFile(file, 'not valid json{{{', 'utf8');
+        await appendMetadataRecord(file, recA);
+        const parsed = JSON.parse(await readFile(file, 'utf8'));
+        expect(parsed).toEqual([recA]);
+    });
 });
 
 jest.mock('../../src/tools/gh-utils', () => ({

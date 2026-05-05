@@ -229,48 +229,6 @@ const writeMetadataToFile = async (path, metadata) => {
 };
 
 /**
- * Append a metadata record to a per-day JSON file.
- * Creates the file as a one-element array if it does not exist.
- * Migrates legacy single-object files to a two-element array on first
- * append.
- *
- * @param {string} filePath  per-day metadata file path
- * @param {Object} record    metadata record (see PollMetadataRecord)
- */
-const appendMetadataRecord = async (filePath, record) => {
-    await mkdir(dirname(filePath), { recursive: true });
-    let existing = [];
-    if (await pathExists(filePath)) {
-        const raw = await readFile(filePath, 'utf8');
-        const parsed = JSON.parse(raw);
-        existing = Array.isArray(parsed) ? parsed : [parsed];
-    }
-    existing.push(record);
-    await writeFile(filePath, JSON.stringify(existing, null, 2));
-};
-
-/**
- * Append synthetic events to their date-aligned JSONL files and run
- * dedupe so the existing id-based dedupe collapses repeats.
- *
- * @param {string} collectionPath  path to the collection root
- * @param {Array<Object>} events   synthetic events with `id` and `created_at`
- */
-const mergeSyntheticEventsIntoCollection = async (collectionPath, events) => {
-    if (!events || events.length === 0) return;
-    await mkdir(collectionPath, { recursive: true });
-    const sorted = sortEventsByDate(events);
-    await Promise.all(Object.keys(sorted).map((date) => writeEventsToFile(
-        `${collectionPath}/${date}${COLLECTION_FILE_EXTENSION}`,
-        sorted[date],
-        'a',
-    )));
-    await Promise.all(Object.keys(sorted).map((date) => removeDupesFromFile(
-        `${collectionPath}/${date}${COLLECTION_FILE_EXTENSION}`,
-    )));
-};
-
-/**
  * Read all metadata records from a per-day JSON file.
  * Returns an empty array if the file does not exist.
  * Migrates legacy single-object files to an array on read.
@@ -294,6 +252,43 @@ const readMetadataRecords = async (filePath) => {
     }
 
     return Array.isArray(parsed) ? parsed : [parsed];
+};
+
+/**
+ * Append a metadata record to a per-day JSON file.
+ * Creates the file as a one-element array if it does not exist.
+ * Migrates legacy single-object files to a two-element array on first
+ * append. Treats a corrupted file as empty (warns to stderr).
+ *
+ * @param {string} filePath  per-day metadata file path
+ * @param {Object} record    metadata record (see PollMetadataRecord)
+ */
+const appendMetadataRecord = async (filePath, record) => {
+    await mkdir(dirname(filePath), { recursive: true });
+    const existing = await readMetadataRecords(filePath);
+    existing.push(record);
+    await writeFile(filePath, JSON.stringify(existing, null, 2));
+};
+
+/**
+ * Append synthetic events to their date-aligned JSONL files and run
+ * dedupe so the existing id-based dedupe collapses repeats.
+ *
+ * @param {string} collectionPath  path to the collection root
+ * @param {Array<Object>} events   synthetic events with `id` and `created_at`
+ */
+const mergeSyntheticEventsIntoCollection = async (collectionPath, events) => {
+    if (!events || events.length === 0) return;
+    await mkdir(collectionPath, { recursive: true });
+    const sorted = sortEventsByDate(events);
+    await Promise.all(Object.keys(sorted).map((date) => writeEventsToFile(
+        `${collectionPath}/${date}${COLLECTION_FILE_EXTENSION}`,
+        sorted[date],
+        'a',
+    )));
+    await Promise.all(Object.keys(sorted).map((date) => removeDupesFromFile(
+        `${collectionPath}/${date}${COLLECTION_FILE_EXTENSION}`,
+    )));
 };
 
 export {
