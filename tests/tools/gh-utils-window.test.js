@@ -8,28 +8,32 @@ jest.mock('@octokit/core', () => {
                 return {
                     headers: {},
                     data: [
-                        {
-                            id: 1,
-                            number: 100,
-                            closed_at: '2026-04-21T10:00:00Z',
-                            closed_by: { login: 'alice' },
-                            labels: [],
-                            pull_request: undefined,
-                        },
+                        // desc order by updated_at: newest first
                         // pull_request key indicates a PR — must be filtered out
                         {
                             id: 2,
                             number: 101,
                             closed_at: '2026-04-21T11:00:00Z',
+                            updated_at: '2026-04-21T11:00:00Z',
                             closed_by: { login: 'bob' },
                             labels: [],
                             pull_request: { url: 'x' },
                         },
-                        // out of window
+                        {
+                            id: 1,
+                            number: 100,
+                            closed_at: '2026-04-21T10:00:00Z',
+                            updated_at: '2026-04-21T10:00:00Z',
+                            closed_by: { login: 'alice' },
+                            labels: [],
+                            pull_request: undefined,
+                        },
+                        // updated_at before since → triggers early exit
                         {
                             id: 3,
                             number: 102,
                             closed_at: '2026-04-19T10:00:00Z',
+                            updated_at: '2026-04-19T10:00:00Z',
                             closed_by: { login: 'alice' },
                             labels: [],
                             pull_request: undefined,

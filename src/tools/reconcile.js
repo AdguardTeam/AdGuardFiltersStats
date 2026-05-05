@@ -44,8 +44,20 @@ const prMergedEvent = (pr, repo) => {
 /**
  * Convert REST payloads into synthetic events that match the live
  * Events-API shape consumed by the rest of the pipeline.
+ *
+ * @param {{
+ *   closedIssues: Array,
+ *   pulls: Array,
+ *   repo: Object,
+ *   timePeriod: {since: string, until: string}
+ * }} params
  */
-export const buildSyntheticEvents = ({ closedIssues, pulls, repo }) => {
+export const buildSyntheticEvents = ({
+    closedIssues, pulls, repo, timePeriod,
+}) => {
+    const { since, until } = timePeriod;
+    const sinceMs = new Date(since).getTime();
+    const untilMs = new Date(until).getTime();
     const events = [];
     // eslint-disable-next-line no-restricted-syntax
     for (const issue of closedIssues) {
@@ -54,8 +66,15 @@ export const buildSyntheticEvents = ({ closedIssues, pulls, repo }) => {
     }
     // eslint-disable-next-line no-restricted-syntax
     for (const pr of pulls) {
-        const opened = prOpenedEvent(pr, repo);
-        if (opened) events.push(opened);
+        // Only emit an opened event when the PR was created within the window.
+        // getPullsInWindow also returns PRs opened before `since` that were
+        // merged in the window; emitting an opened event for those would inject
+        // historical data outside the reporting period.
+        const createdMs = new Date(pr.created_at).getTime();
+        if (createdMs >= sinceMs && createdMs <= untilMs) {
+            const opened = prOpenedEvent(pr, repo);
+            if (opened) events.push(opened);
+        }
         const merged = prMergedEvent(pr, repo);
         if (merged) events.push(merged);
     }
@@ -71,17 +90,23 @@ export const buildSyntheticEvents = ({ closedIssues, pulls, repo }) => {
  * @param {{id: number, name: string}} repoMeta
  */
 export const reconcileWindow = async (commonRequestData, timePeriod, repoMeta) => {
-    try {
-        const [closedIssues, pulls] = await Promise.all([
-            getClosedIssuesInWindow(commonRequestData, timePeriod),
-            getPullsInWindow(commonRequestData, timePeriod),
-        ]);
-        return {
-            injectedEvents: buildSyntheticEvents({ closedIssues, pulls, repo: repoMeta }),
-            restRequestsMade: 2,
-            error: null,
-        };
-    } catch (error) {
-        return { injectedEvents: [], restRequestsMade: 0, error: error.message };
-    }
+    const [issuesResult, pullsResult] = await Promise.allSettled([
+        getClosedIssuesInWindow(commonRequestData, timePeriod),
+        getPullsInWindow(commonRequestData, timePeriod),
+    ]);
+    const closedIssues = issuesResult.status === 'fulfilled' ? issuesResult.value : [];
+    const pulls = pullsResult.status === 'fulfilled' ? pullsResult.value : [];
+    const restRequestsMade = [issuesResult, pullsResult]
+        .filter((r) => r.status === 'fulfilled').length;
+    const errors = [issuesResult, pullsResult]
+        .filter((r) => r.status === 'rejected')
+        .map((r) => r.reason.message);
+    const error = errors.length > 0 ? errors.join('; ') : null;
+    return {
+        injectedEvents: buildSyntheticEvents({
+            closedIssues, pulls, repo: repoMeta, timePeriod,
+        }),
+        restRequestsMade,
+        error,
+    };
 };

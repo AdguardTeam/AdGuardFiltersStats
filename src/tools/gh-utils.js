@@ -147,6 +147,7 @@ const inWindow = (iso, since, until) => {
  */
 export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => {
     const { since, until } = timePeriod;
+    const sinceMs = new Date(since).getTime();
     const collected = [];
     let page = 1;
     let stop = false;
@@ -157,7 +158,7 @@ export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => 
             state: 'closed',
             since,
             sort: 'updated',
-            direction: 'asc',
+            direction: 'desc',
             per_page: 100,
             page,
         });
@@ -165,9 +166,15 @@ export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => 
         for (const row of data) {
             // eslint-disable-next-line no-continue
             if (row.pull_request) continue;
-            // Do not short-circuit on updated_at > until: an issue can have
+            // With desc order, once updated_at < since no subsequent issue can
+            // have closed_at inside the window (closed_at <= updated_at always).
+            // Do NOT short-circuit on updated_at > until: an issue can have
             // closed_at inside the window but updated_at later (e.g. a comment
-            // was added after the window closed), so we must scan all pages.
+            // was added after the window closed).
+            if (new Date(row.updated_at).getTime() < sinceMs) {
+                stop = true;
+                break;
+            }
             if (inWindow(row.closed_at, since, until)) collected.push(row);
         }
         const link = headers.link || '';

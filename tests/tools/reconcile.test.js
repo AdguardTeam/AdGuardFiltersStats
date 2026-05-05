@@ -3,12 +3,23 @@ import { tmpdir } from 'os';
 import path from 'path';
 import {
     buildSyntheticEvents,
+    reconcileWindow,
 } from '../../src/tools/reconcile';
 import {
     mergeSyntheticEventsIntoCollection,
 } from '../../src/tools/fs-utils';
+import {
+    getClosedIssuesInWindow,
+    getPullsInWindow,
+} from '../../src/tools/gh-utils';
+
+jest.mock('../../src/tools/gh-utils', () => ({
+    getClosedIssuesInWindow: jest.fn(),
+    getPullsInWindow: jest.fn(),
+}));
 
 const repo = { id: 1, name: 'AdguardTeam/AdguardFilters' };
+const timePeriod = { since: '2026-04-21T00:00:00Z', until: '2026-04-21T23:59:59Z' };
 
 const loadFixture = async (name) => JSON.parse(
     await readFile(path.join(__dirname, '..', 'test-files', 'reconcile', name), 'utf8'),
@@ -17,7 +28,9 @@ const loadFixture = async (name) => JSON.parse(
 describe('buildSyntheticEvents', () => {
     it('builds a closed IssuesEvent for each non-null closed_by', async () => {
         const issues = await loadFixture('closed-issues.json');
-        const events = buildSyntheticEvents({ closedIssues: issues, pulls: [], repo });
+        const events = buildSyntheticEvents({
+            closedIssues: issues, pulls: [], repo, timePeriod,
+        });
         const issueEvents = events.filter((e) => e.type === 'IssuesEvent');
         expect(issueEvents.map((e) => e.actor.login)).toEqual(['user1', 'user1']);
         // Stale label is preserved on the issue payload so isStale works
@@ -29,7 +42,9 @@ describe('buildSyntheticEvents', () => {
 
     it('builds opened and merged PullRequestEvents using pull_request.user', async () => {
         const pulls = await loadFixture('pulls.json');
-        const events = buildSyntheticEvents({ closedIssues: [], pulls, repo });
+        const events = buildSyntheticEvents({
+            closedIssues: [], pulls, repo, timePeriod,
+        });
         const prEvents = events.filter((e) => e.type === 'PullRequestEvent');
         // PR 300: opened + merged → 2 events; PR 301: opened only → 1 event
         expect(prEvents).toHaveLength(3);
@@ -41,11 +56,35 @@ describe('buildSyntheticEvents', () => {
     it('produces stable, idempotent ids', async () => {
         const issues = await loadFixture('closed-issues.json');
         const pulls = await loadFixture('pulls.json');
-        const a = buildSyntheticEvents({ closedIssues: issues, pulls, repo });
-        const b = buildSyntheticEvents({ closedIssues: issues, pulls, repo });
+        const a = buildSyntheticEvents({
+            closedIssues: issues, pulls, repo, timePeriod,
+        });
+        const b = buildSyntheticEvents({
+            closedIssues: issues, pulls, repo, timePeriod,
+        });
         expect(a.map((e) => e.id)).toEqual(b.map((e) => e.id));
         // Synthetic ids are namespaced
         expect(a.every((e) => e.id.startsWith('synthetic-'))).toBe(true);
+    });
+
+    it('omits opened event for PRs created before the window', () => {
+        const prBeforeWindow = {
+            id: 5003,
+            number: 302,
+            created_at: '2026-04-15T08:00:00Z',
+            merged_at: '2026-04-21T10:00:00Z',
+            user: { id: 300, login: 'user3' },
+        };
+        const events = buildSyntheticEvents({
+            closedIssues: [],
+            pulls: [prBeforeWindow],
+            repo,
+            timePeriod,
+        });
+        const prEvents = events.filter((e) => e.type === 'PullRequestEvent');
+        // Only merged event; opened is suppressed because created_at is before the window
+        expect(prEvents).toHaveLength(1);
+        expect(prEvents[0].payload.action).toBe('closed');
     });
 });
 
@@ -92,5 +131,41 @@ describe('mergeSyntheticEventsIntoCollection', () => {
             'live-1',
             'synthetic-issue-closed-4001-1745217074000',
         ]);
+    });
+});
+
+describe('reconcileWindow', () => {
+    const repoMeta = { id: 1, name: 'o/r' };
+    const commonRequestData = { owner: 'o', repo: 'r' };
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    it('returns injectedEvents, restRequestsMade: 2, and no error when both requests succeed', async () => {
+        getClosedIssuesInWindow.mockResolvedValueOnce([]);
+        getPullsInWindow.mockResolvedValueOnce([]);
+        const result = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
+        expect(result.restRequestsMade).toBe(2);
+        expect(result.error).toBeNull();
+        expect(result.injectedEvents).toEqual([]);
+    });
+
+    it('returns partial events, restRequestsMade: 1, and error message when one request fails', async () => {
+        getClosedIssuesInWindow.mockRejectedValueOnce(new Error('rate limit'));
+        getPullsInWindow.mockResolvedValueOnce([]);
+        const result = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
+        expect(result.restRequestsMade).toBe(1);
+        expect(result.error).toContain('rate limit');
+        expect(result.injectedEvents).toEqual([]);
+    });
+
+    it('returns restRequestsMade: 0 and combined error when both requests fail', async () => {
+        getClosedIssuesInWindow.mockRejectedValueOnce(new Error('issues fail'));
+        getPullsInWindow.mockRejectedValueOnce(new Error('pulls fail'));
+        const result = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
+        expect(result.restRequestsMade).toBe(0);
+        expect(result.error).toContain('issues fail');
+        expect(result.error).toContain('pulls fail');
     });
 });

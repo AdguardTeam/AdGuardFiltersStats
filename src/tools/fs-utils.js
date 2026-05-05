@@ -111,21 +111,27 @@ const writeEventsToFile = async (path, events, flag) => {
         return;
     }
 
-    const readable = new Readable({
-        objectMode: true,
-        read: () => { },
-    });
+    await new Promise((resolve, reject) => {
+        const readable = new Readable({
+            objectMode: true,
+            read: () => { },
+        });
 
-    chain([
-        readable,
-        (event) => `${JSON.stringify(event)}\n`,
-        createWriteStream(path, {
-            flags: flag,
-        }),
-    ]);
+        const writeStream = createWriteStream(path, { flags: flag });
+        writeStream.on('finish', resolve);
+        writeStream.on('error', reject);
+        readable.on('error', reject);
 
-    events.forEach((event) => {
-        readable.push(event);
+        chain([
+            readable,
+            (event) => `${JSON.stringify(event)}\n`,
+            writeStream,
+        ]);
+
+        events.forEach((event) => {
+            readable.push(event);
+        });
+        readable.push(null);
     });
 };
 
