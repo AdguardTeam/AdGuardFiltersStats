@@ -107,4 +107,42 @@ describe('pollEvents — gap detection', () => {
         );
         expect(records[1].gapSuspected).toBe(false);
     });
+
+    it('sets gapSuspected=true on event-based gap (oldest > newest + 90min)', async () => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        // Last poll was 10 minutes ago (within time threshold),
+        // but the events indicate a gap: previous newest event was 3 hours ago
+        const tenMinAgo = subMinutes(new Date(), 10).toISOString();
+        const threeHoursAgo = subMinutes(new Date(), 180).toISOString();
+        const recentRecord = {
+            timestamp: tenMinAgo,
+            totalEvents: 5,
+            pagesCollected: 1,
+            eventsWritten: 5,
+            rateLimitRemaining: 4995,
+            rateLimitReached: false,
+            rateLimitReset: null,
+            oldestEventAt: subMinutes(new Date(), 190).toISOString(),
+            newestEventAt: threeHoursAgo,
+            gapSuspected: false,
+            error: null,
+            collectionPath: dir,
+            repo: 'a/b',
+        };
+        await writeFile(
+            path.join(dir, `${today}-metadata.json`),
+            JSON.stringify([recentRecord]),
+        );
+        // Current poll returns an event created just now — gap between
+        // threeHoursAgo and now exceeds 90 minutes
+        getGithubEvents.mockResolvedValueOnce(makeGhResponse(new Date().toISOString()));
+
+        await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+        const records = JSON.parse(
+            await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
+        );
+        expect(records).toHaveLength(2);
+        expect(records[1].gapSuspected).toBe(true);
+    });
 });

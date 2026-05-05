@@ -68,6 +68,8 @@ jest.mock('../../src/tools/gh-utils', () => ({
         },
     })),
     getOpenIssues: jest.fn(async () => []),
+    getClosedIssuesInWindow: jest.fn(async () => []),
+    getPullsInWindow: jest.fn(async () => []),
 }));
 
 // eslint-disable-next-line import/first
