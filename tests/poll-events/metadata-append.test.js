@@ -77,15 +77,22 @@ import { pollEvents } from '../../src/poll-events';
 
 describe('pollEvents — metadata is append-only', () => {
     it('writes one new record per call to the per-day file', async () => {
-        const dir = await mkdtemp(path.join(tmpdir(), 'poll-'));
-        await pollEvents(dir, { owner: 'a', repo: 'b' });
-        await pollEvents(dir, { owner: 'a', repo: 'b' });
-        const today = format(new Date(), 'yyyy-MM-dd');
-        const parsed = JSON.parse(
-            await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
-        );
-        expect(Array.isArray(parsed)).toBe(true);
-        expect(parsed.length).toBe(2);
-        expect(parsed[0].totalEvents).toBe(1);
+        jest.useFakeTimers();
+        jest.setSystemTime(new Date('2026-04-21T12:00:00Z'));
+
+        try {
+            const dir = await mkdtemp(path.join(tmpdir(), 'poll-'));
+            await pollEvents(dir, { owner: 'a', repo: 'b' });
+            await pollEvents(dir, { owner: 'a', repo: 'b' });
+            const today = format(new Date(), 'yyyy-MM-dd');
+            const parsed = JSON.parse(
+                await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
+            );
+            expect(Array.isArray(parsed)).toBe(true);
+            expect(parsed.length).toBe(2);
+            expect(parsed[0].totalEvents).toBe(1);
+        } finally {
+            jest.useRealTimers();
+        }
     });
 });

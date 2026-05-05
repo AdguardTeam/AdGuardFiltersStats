@@ -7,6 +7,7 @@ import {
     writeFile,
     readFile,
 } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import {
     format,
     endOfYesterday,
@@ -237,7 +238,7 @@ const writeMetadataToFile = async (path, metadata) => {
  * @param {Object} record    metadata record (see PollMetadataRecord)
  */
 const appendMetadataRecord = async (filePath, record) => {
-    await mkdir(filePath.substring(0, filePath.lastIndexOf('/')), { recursive: true });
+    await mkdir(dirname(filePath), { recursive: true });
     let existing = [];
     if (await pathExists(filePath)) {
         const raw = await readFile(filePath, 'utf8');

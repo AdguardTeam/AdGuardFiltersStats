@@ -147,6 +147,7 @@ const inWindow = (iso, since, until) => {
  */
 export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => {
     const { since, until } = timePeriod;
+    const untilMs = new Date(until).getTime();
     const collected = [];
     let page = 1;
     let stop = false;
@@ -165,6 +166,12 @@ export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => 
         for (const row of data) {
             // eslint-disable-next-line no-continue
             if (row.pull_request) continue;
+            // Results are sorted ascending by updated_at; once we exceed until
+            // all subsequent rows are also out of range.
+            if (new Date(row.updated_at).getTime() > untilMs) {
+                stop = true;
+                break;
+            }
             if (inWindow(row.closed_at, since, until)) collected.push(row);
         }
         const link = headers.link || '';
@@ -200,8 +207,7 @@ export const getPullsInWindow = async (commonRequestData, timePeriod) => {
             const updatedMs = new Date(pr.updated_at).getTime();
             if (updatedMs < sinceMs) {
                 stop = true;
-                // eslint-disable-next-line no-continue
-                continue;
+                break;
             }
             const openedIn = inWindow(pr.created_at, since, until);
             const mergedIn = pr.merged_at && inWindow(pr.merged_at, since, until);
