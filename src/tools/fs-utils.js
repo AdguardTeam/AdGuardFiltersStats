@@ -283,7 +283,14 @@ const readMetadataRecords = async (filePath) => {
     }
 
     const raw = await readFile(filePath, 'utf8');
-    const parsed = JSON.parse(raw);
+    let parsed;
+    try {
+        parsed = JSON.parse(raw);
+    } catch {
+        // eslint-disable-next-line no-console
+        console.warn(`⚠️ Metadata file is corrupted (${filePath}), treating as empty.`);
+        return [];
+    }
 
     return Array.isArray(parsed) ? parsed : [parsed];
 };
