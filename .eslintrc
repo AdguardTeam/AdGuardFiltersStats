@@ -1,6 +1,7 @@
 {
     "extends": [
-        "airbnb-base"
+        "airbnb-base",
+        "plugin:jsdoc/recommended"
     ],
     "env": {
         "node": true,
@@ -15,11 +16,87 @@
                 "ignoreComments": false
             }
         ],
+        "max-len": [
+            "error",
+            {
+                "code": 120,
+                "comments": 120,
+                "tabWidth": 4,
+                "ignoreUrls": true,
+                "ignoreTrailingComments": false,
+                "ignoreComments": false
+            }
+        ],
         "curly": ["error", "all"],
         "brace-style": ["error", "1tbs", {
             "allowSingleLine": false
         }],
         "no-continue": "off",
+        "jsdoc/require-param-type": "off",
+        "jsdoc/no-undefined-types": "off",
+        "jsdoc/require-returns-type": "off",
+        "jsdoc/require-param-description": "error",
+        "jsdoc/require-property-description": "error",
+        "jsdoc/require-returns-description": "error",
+        "jsdoc/require-returns": "error",
+        "jsdoc/require-param": "error",
+        "jsdoc/require-returns-check": "error",
+        "jsdoc/require-hyphen-before-param-description": ["error", "never"],
+        "jsdoc/require-jsdoc": [
+            "error",
+            {
+                "contexts": [
+                    "ClassDeclaration",
+                    "ClassProperty",
+                    "PropertyDefinition",
+                    "FunctionDeclaration",
+                    "MethodDefinition"
+                ]
+            }
+        ],
+        "jsdoc/require-description": [
+            "error",
+            {
+                "contexts": [
+                    "ClassDeclaration",
+                    "ClassProperty",
+                    "PropertyDefinition",
+                    "FunctionDeclaration",
+                    "MethodDefinition"
+                ]
+            }
+        ],
+        "jsdoc/require-description-complete-sentence": [
+            "error",
+            {
+                "abbreviations": [
+                    "e.g.",
+                    "i.e."
+                ]
+            }
+        ],
+        "jsdoc/multiline-blocks": [
+            "error",
+            {
+                "noSingleLineBlocks": true
+            }
+        ],
+        "jsdoc/tag-lines": [
+            "error",
+            "any",
+            {
+                "startLines": 1
+            }
+        ],
+        "jsdoc/sort-tags": ["error", {
+            "linesBetween": 1,
+            "tagSequence": [
+                { "tags": ["see"] },
+                { "tags": ["param"] },
+                { "tags": ["returns"] },
+                { "tags": ["throws"] }
+            ]
+        }],
         "arrow-body-style": "off",
         "no-else-return": "off",
         "import/prefer-default-export": "off"
