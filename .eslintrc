@@ -15,6 +15,10 @@
                 "ignoreComments": false
             }
         ],
+        "curly": ["error", "all"],
+        "brace-style": ["error", "1tbs", {
+            "allowSingleLine": false
+        }],
         "arrow-body-style": "off",
         "no-else-return": "off",
         "import/prefer-default-export": "off"

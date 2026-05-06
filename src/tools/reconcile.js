@@ -3,7 +3,9 @@ import { getClosedIssuesInWindow, getPullsInWindow } from './gh-utils';
 const epochMs = (iso) => new Date(iso).getTime();
 
 const issueClosedEvent = (issue, repo) => {
-    if (!issue.closed_by || !issue.closed_by.login) return null;
+    if (!issue.closed_by || !issue.closed_by.login) {
+        return null;
+    }
     return {
         id: `synthetic-issue-closed-${issue.id}-${epochMs(issue.closed_at)}`,
         type: 'IssuesEvent',
@@ -15,7 +17,9 @@ const issueClosedEvent = (issue, repo) => {
 };
 
 const prOpenedEvent = (pr, repo) => {
-    if (!pr.user || !pr.user.login) return null;
+    if (!pr.user || !pr.user.login) {
+        return null;
+    }
     return {
         id: `synthetic-pr-opened-${pr.id}`,
         type: 'PullRequestEvent',
@@ -30,7 +34,9 @@ const prOpenedEvent = (pr, repo) => {
 };
 
 const prMergedEvent = (pr, repo) => {
-    if (!pr.merged_at || !pr.user || !pr.user.login) return null;
+    if (!pr.merged_at || !pr.user || !pr.user.login) {
+        return null;
+    }
     return {
         id: `synthetic-pr-merged-${pr.id}`,
         type: 'PullRequestEvent',
@@ -62,7 +68,9 @@ export const buildSyntheticEvents = ({
     // eslint-disable-next-line no-restricted-syntax
     for (const issue of closedIssues) {
         const ev = issueClosedEvent(issue, repo);
-        if (ev) events.push(ev);
+        if (ev) {
+            events.push(ev);
+        }
     }
     // eslint-disable-next-line no-restricted-syntax
     for (const pr of pulls) {
@@ -73,10 +81,14 @@ export const buildSyntheticEvents = ({
         const createdMs = new Date(pr.created_at).getTime();
         if (createdMs >= sinceMs && createdMs <= untilMs) {
             const opened = prOpenedEvent(pr, repo);
-            if (opened) events.push(opened);
+            if (opened) {
+                events.push(opened);
+            }
         }
         const merged = prMergedEvent(pr, repo);
-        if (merged) events.push(merged);
+        if (merged) {
+            events.push(merged);
+        }
     }
     return events;
 };

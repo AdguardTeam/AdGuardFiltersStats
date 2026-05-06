@@ -132,7 +132,9 @@ const ENDPOINT_ISSUES_LIST = 'GET /repos/{owner}/{repo}/issues';
 const ENDPOINT_PULLS_LIST = 'GET /repos/{owner}/{repo}/pulls';
 
 const inWindow = (iso, since, until) => {
-    if (!iso) return false;
+    if (!iso) {
+        return false;
+    }
     const t = new Date(iso).getTime();
     return t >= new Date(since).getTime() && t <= new Date(until).getTime();
 };
@@ -164,8 +166,10 @@ export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => 
         });
         // eslint-disable-next-line no-restricted-syntax
         for (const row of data) {
-            // eslint-disable-next-line no-continue
-            if (row.pull_request) continue;
+            if (row.pull_request) {
+                // eslint-disable-next-line no-continue
+                continue;
+            }
             // With desc order, once updated_at < since no subsequent issue can
             // have closed_at inside the window (closed_at <= updated_at always).
             // Do NOT short-circuit on updated_at > until: an issue can have
@@ -175,10 +179,14 @@ export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => 
                 stop = true;
                 break;
             }
-            if (inWindow(row.closed_at, since, until)) collected.push(row);
+            if (inWindow(row.closed_at, since, until)) {
+                collected.push(row);
+            }
         }
         const link = headers.link || '';
-        if (!link.includes('rel="next"') || data.length === 0) stop = true;
+        if (!link.includes('rel="next"') || data.length === 0) {
+            stop = true;
+        }
         page += 1;
     }
     return collected;
@@ -214,10 +222,14 @@ export const getPullsInWindow = async (commonRequestData, timePeriod) => {
             }
             const openedIn = inWindow(pr.created_at, since, until);
             const mergedIn = pr.merged_at && inWindow(pr.merged_at, since, until);
-            if (openedIn || mergedIn) collected.push(pr);
+            if (openedIn || mergedIn) {
+                collected.push(pr);
+            }
         }
         const link = headers.link || '';
-        if (!link.includes('rel="next"') || data.length === 0) stop = true;
+        if (!link.includes('rel="next"') || data.length === 0) {
+            stop = true;
+        }
         page += 1;
     }
     return collected;

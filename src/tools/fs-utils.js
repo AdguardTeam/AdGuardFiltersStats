@@ -280,11 +280,13 @@ const appendMetadataRecord = async (filePath, record) => {
  * Append synthetic events to their date-aligned JSONL files and run
  * dedupe so the existing id-based dedupe collapses repeats.
  *
- * @param {string} collectionPath  path to the collection root
- * @param {Array<Object>} events   synthetic events with `id` and `created_at`
+ * @param {string} collectionPath Path to the collection root.
+ * @param {Array<Object>} events Synthetic events with `id` and `created_at`.
  */
 const mergeSyntheticEventsIntoCollection = async (collectionPath, events) => {
-    if (!events || events.length === 0) return;
+    if (!events || events.length === 0) {
+        return;
+    }
     await mkdir(collectionPath, { recursive: true });
     const sorted = sortEventsByDate(events);
     await Promise.all(Object.keys(sorted).map((date) => writeEventsToFile(

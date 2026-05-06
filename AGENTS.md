@@ -248,6 +248,13 @@ A higher layer may call any layer below it. No layer may depend on a layer
 above it. Sibling feature modules MUST NOT import from each other; if they
 need shared logic, lift it into `src/tools/` or `src/publish-utils/`.
 
+### Style
+
+Follow the [AdGuard JavaScript Code Guidelines][code-guidelines] for
+conventions not covered by the linter.
+
+[code-guidelines]: https://github.com/AdguardTeam/CodeGuidelines/blob/master/JavaScript/Javascript.md
+
 ### Code Quality
 
 - **Module system**: Source under `src/` and `tests/` is authored as ES

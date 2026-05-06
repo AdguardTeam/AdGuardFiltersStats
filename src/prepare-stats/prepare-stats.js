@@ -10,8 +10,10 @@ const dedupeById = (events) => {
     const out = [];
     // eslint-disable-next-line no-restricted-syntax
     for (const e of events) {
-        // eslint-disable-next-line no-continue
-        if (!e || !e.id || seen.has(e.id)) continue;
+        if (!e || !e.id || seen.has(e.id)) {
+            // eslint-disable-next-line no-continue
+            continue;
+        }
         seen.add(e.id);
         out.push(e);
     }
