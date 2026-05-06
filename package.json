@@ -14,7 +14,7 @@
         "publish": "node ./bin/github-publish.js",
         "build": "rollup -c",
         "test": "jest",
-        "lint": "eslint .",
+        "lint": "eslint --cache .",
         "lint-staged": "lint-staged"
     },
     "lint-staged": {
