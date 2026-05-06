@@ -174,13 +174,13 @@ entries load a `.env` file from the working directory if one exists.
 
 ### Common variables
 
-| Variable          | Required for                  | Description                                                                                |
-| ----------------- | ----------------------------- | ------------------------------------------------------------------------------------------ |
-| `COLLECTION_PATH` | All commands                  | Directory for daily JSONL files and metadata sidecars.                                     |
-| `REPO`            | All commands                  | Target repository in `owner/repo_name` form.                                               |
+| Variable          | Required for                             | Description                                                                                |
+| ----------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `COLLECTION_PATH` | All commands                             | Directory for daily JSONL files and metadata sidecars.                                     |
+| `REPO`            | All commands                             | Target repository in `owner/repo_name` form.                                               |
 | `GITHUB_TOKEN`    | `poll` (recommended), `stats`, `publish` | GitHub Personal Access Token. Raises the API rate limit from 60 to 5000 requests per hour. |
-| `SINCE`           | `stats`, `publish`            | Lower bound of the time window (ISO 8601). All stored events are used if omitted.          |
-| `UNTIL`           | `stats`, `publish`            | Upper bound of the time window (ISO 8601). Defaults to now if omitted.                     |
+| `SINCE`           | `stats`, `publish`                       | Lower bound of the time window (ISO 8601). All stored events are used if omitted.          |
+| `UNTIL`           | `stats`, `publish`                       | Upper bound of the time window (ISO 8601). Defaults to now if omitted.                     |
 
 ### Publishing variables
 
