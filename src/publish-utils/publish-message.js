@@ -1,9 +1,11 @@
 /**
- * Post a message to a channel your app is in
- * @param {Object} client Slack WebClient instance
- * @param {Object[]} message array of formatted blocks
- * @param {string} channelId
- * @returns {Object} object with data about sent message
+ * Post a message to a channel your app is in.
+ *
+ * @param {object} client Slack WebClient instance.
+ * @param {object[]} message Array of formatted blocks.
+ * @param {string} channelId Slack channel ID.
+ *
+ * @returns {object} Object with data about sent message.
  */
 export async function publishMessage(client, message, channelId) {
     let messageInfo;

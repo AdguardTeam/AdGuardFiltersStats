@@ -10,10 +10,11 @@ import {
 import { MIN_REQUIRED_ACTIVITY } from '../constants';
 
 /**
- * Prepare and publish statistics data to a Slack channel
- * @param {string} oauthToken
- * @param {string} channelId
- * @param {Object} statistics
+ * Prepare and publish statistics data to a Slack channel.
+ *
+ * @param {string} oauthToken Slack OAuth token.
+ * @param {string} channelId Slack channel ID.
+ * @param {object} statistics Aggregated statistics object.
  */
 export const publishStats = async (oauthToken, channelId, statistics) => {
     const {

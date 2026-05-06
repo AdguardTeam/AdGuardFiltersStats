@@ -1,7 +1,9 @@
 /**
- * Prepare general activity by username
- * @param {Object<Object<Array>>} contributors Contributor instances by username
- * @return {Object<number>} object with activity amount by username
+ * Prepare general activity by username.
+ *
+ * @param {object} contributors Contributor instances by username.
+ *
+ * @returns {object} Object with activity amount by username.
  */
 const prepareActivityStat = (contributors) => {
     const generalContributorStats = {};

@@ -2,9 +2,11 @@ import { countEventsByType, eventsToActivityByTime } from '../tools/events-utils
 import { EVENT_TYPES } from '../constants';
 
 /**
- * Count and sort activities
- * @param {Object<Object<Array>>} contributors Contributor instances by username
- * @return {Object<Object>}
+ * Count and sort activities.
+ *
+ * @param {object} contributors Contributor instances by username.
+ *
+ * @returns {object} Object with activitiesByUser and activitiesByTime.
  */
 export const prepareDetailedActivityStat = (contributors) => {
     // Activities amount by username and activity type

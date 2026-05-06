@@ -20,12 +20,13 @@ const dedupeById = (events) => {
 };
 
 /**
- * Process all stored events to compose statistics object
+ * Process all stored events to compose statistics object.
  *
- * @param {string} collectionPath path to events collection
- * @param {Object} commonRequestData
- * @param {Object} timePeriod
- * @return {Object}
+ * @param {string} collectionPath Path to events collection.
+ * @param {object} commonRequestData Object with `owner` and `repo` strings.
+ * @param {object} timePeriod Object with `since` and `until` ISO date strings.
+ *
+ * @returns {object} Statistics object.
  */
 export const prepareStats = async (collectionPath, commonRequestData, timePeriod) => {
     const liveEvents = await getEventsFromCollection(collectionPath, timePeriod);

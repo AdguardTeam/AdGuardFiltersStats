@@ -48,15 +48,26 @@ const prMergedEvent = (pr, repo) => {
 };
 
 /**
+ * @typedef {object} TimePeriod
+ * @property {string} since ISO 8601 date string representing the start of the time window (inclusive).
+ * @property {string} until ISO 8601 date string representing the end of the time window (inclusive).
+ */
+
+/**
+ * @typedef {object} RepoMeta
+ * @property {Array} closedIssues Array of issues closed in the window.
+ * @property {Array} pulls Array of pull requests opened or merged in the window.
+ * @property {object} repo Repository metadata object with `id` and `name` fields.
+ * @property {object} timePeriod Object with `since` and `until` ISO date strings.
+ */
+
+/**
  * Convert REST payloads into synthetic events that match the live
  * Events-API shape consumed by the rest of the pipeline.
  *
- * @param {{
- *   closedIssues: Array,
- *   pulls: Array,
- *   repo: Object,
- *   timePeriod: {since: string, until: string}
- * }} params
+ * @param {RepoMeta} params Parameters for synthetic event construction.
+ *
+ * @returns {Array<object>} Array of synthetic event objects.
  */
 export const buildSyntheticEvents = ({
     closedIssues, pulls, repo, timePeriod,
@@ -97,9 +108,13 @@ export const buildSyntheticEvents = ({
  * Fetch REST data for the window and return synthetic events plus a
  * diagnostic record. Never throws — REST failure surfaces in `error`.
  *
- * @param {{owner: string, repo: string}} commonRequestData
- * @param {{since: string, until: string}} timePeriod
- * @param {{id: number, name: string}} repoMeta
+ * @param {{owner: string, repo: string}} commonRequestData Common request data for the GitHub API.
+ * @param {TimePeriod} timePeriod Object with `since` and `until` ISO date strings.
+ * @param {RepoMeta} repoMeta Repository metadata object with `id` and `name` fields,
+ * used for synthetic event construction.
+ *
+ * @returns {Promise<{injectedEvents: Array<object>, restRequestsMade: number, error: string|null}>} Object
+ * with synthetic events array, count of successful REST requests, and error message if any.
  */
 export const reconcileWindow = async (commonRequestData, timePeriod, repoMeta) => {
     const [issuesResult, pullsResult] = await Promise.allSettled([
@@ -116,6 +131,7 @@ export const reconcileWindow = async (commonRequestData, timePeriod, repoMeta) =
     const error = errors.length > 0 ? errors.join('; ') : null;
     return {
         injectedEvents: buildSyntheticEvents({
+            // FIXME: add eslint rule to enforce multiline for 3 and more items in object/array literals
             closedIssues, pulls, repo: repoMeta, timePeriod,
         }),
         restRequestsMade,

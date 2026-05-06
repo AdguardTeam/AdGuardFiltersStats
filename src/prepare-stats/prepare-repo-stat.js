@@ -8,11 +8,13 @@ import {
 import { EVENT_TYPES } from '../constants';
 
 /**
- * Prepare general repo stats
+ * Prepare general repo stats.
  *
- * @param {Array<Object>} events array of Github events objects
- * @param {Object} commonRequestData
- * @return {Object}
+ * @param {Array<object>} events Array of GitHub events objects.
+ * @param {object} commonRequestData GitHub API request parameters.
+ * @param {object} timePeriod Time period with since and until.
+ *
+ * @returns {Promise<object>} General repository statistics.
  */
 export const prepareRepoStat = async (events, commonRequestData, timePeriod) => {
     const issuesEvents = events.filter((e) => e.type === EVENT_TYPES.ISSUES_EVENT);

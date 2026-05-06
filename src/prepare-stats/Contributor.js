@@ -1,11 +1,22 @@
 import { getCommitsCount } from '../tools/events-utils';
 import { EVENT_TYPES } from '../constants';
 
+/**
+ * Represents a contributor and their activity events.
+ */
 export class Contributor {
+    /**
+     * Creates a new Contributor instance with empty events.
+     */
     constructor() {
         this.events = {};
     }
 
+    /**
+     * Adds an activity event to the contributor's event collection.
+     *
+     * @param {object} event GitHub event object.
+     */
     addActivityEvent(event) {
         const { type } = event;
         if (!this.events[type]) {
@@ -15,6 +26,11 @@ export class Contributor {
         this.events[type].push(event);
     }
 
+    /**
+     * Counts total activity across all event types.
+     *
+     * @returns {number} Total activity count.
+     */
     countTotalActivity() {
         let activityCount = 0;
         // eslint-disable-next-line no-restricted-syntax

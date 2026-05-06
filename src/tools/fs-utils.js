@@ -42,10 +42,12 @@ const pathExists = async (path) => {
 };
 
 /**
- * Gets array of GitHub event objects from file and by timePeriod
- * @param {string} path path to the file to read from
- * @param {object} timePeriod
- * @return {Promise<Array<Object>>} array with GitHub event objects
+ * Gets array of GitHub event objects from file and by timePeriod.
+ *
+ * @param {string} path Path to the file to read from.
+ * @param {object} timePeriod Time window with since and until.
+ *
+ * @returns {Promise<Array<object>>} Array with GitHub event objects.
  */
 const getEventsFromFile = async (path, timePeriod) => {
     const { until, since } = timePeriod;
@@ -75,10 +77,12 @@ const getEventsFromFile = async (path, timePeriod) => {
 };
 
 /**
- * Gets array of GitHub event objects from collection and by search time
- * @param {string} path path to collection dir
- * @param {object} timePeriod
- * @return {Promise<Array<Object>>} array with GitHub event objects
+ * Gets array of GitHub event objects from collection and by search time.
+ *
+ * @param {string} path Path to collection dir.
+ * @param {object} timePeriod Time window with since and until.
+ *
+ * @returns {Promise<Array<object>>} Array with GitHub event objects.
  */
 const getEventsFromCollection = async (path, timePeriod) => {
     const hasDir = await pathExists(path);
@@ -101,10 +105,11 @@ const getEventsFromCollection = async (path, timePeriod) => {
 };
 
 /**
- * Writes events from array to path as a stream, path is created if there is none
- * @param {string} path path to a file
- * @param {Array.<Object>} events array with GitHub event objects
- * @param {string} flag node flag for write stream
+ * Writes events from array to path as a stream, path is created if there is none.
+ *
+ * @param {string} path Path to a file.
+ * @param {Array.<object>} events Array with GitHub event objects.
+ * @param {string} flag Node flag for write stream.
  */
 const writeEventsToFile = async (path, events, flag) => {
     if (events.length === 0) {
@@ -136,9 +141,10 @@ const writeEventsToFile = async (path, events, flag) => {
 };
 
 /**
- * Sort events by date of creation and write them to a corresponding file
- * @param {string} path path to collection dir
- * @param {Array<Object>} events array with GitHub event objects
+ * Sort events by date of creation and write them to a corresponding file.
+ *
+ * @param {string} path Path to collection dir.
+ * @param {Array<object>} events Array with GitHub event objects.
  */
 const writePollToCollection = async (path, events) => {
     await mkdir(path, { recursive: true });
@@ -150,9 +156,11 @@ const writePollToCollection = async (path, events) => {
 };
 
 /**
- * Remove duplicate events from a file
- * @param {string} path path to a file
- * @returns {Promise<number>} number of unique events after deduplication
+ * Remove duplicate events from a file.
+ *
+ * @param {string} path Path to a file.
+ *
+ * @returns {Promise<number>} Number of unique events after deduplication.
  */
 const removeDupesFromFile = async (path) => {
     const hasFile = await pathExists(path);
@@ -183,9 +191,11 @@ const removeDupesFromFile = async (path) => {
 };
 
 /**
- * Remove duplicate events from collection
- * @param {string} path path to a collection
- * @returns {Promise<number>} number of unique events in today's file after deduplication
+ * Remove duplicate events from collection.
+ *
+ * @param {string} path Path to a collection.
+ *
+ * @returns {Promise<number>} Number of unique events in today's file after deduplication.
  */
 const removeDupesFromCollection = async (path) => {
     const hasCollection = await pathExists(path);
@@ -203,9 +213,10 @@ const removeDupesFromCollection = async (path) => {
 };
 
 /**
- * Deletes files that are older than specified
- * @param {string} path path to a collection
- * @param {number} expirationDays number of days representing events lifespan
+ * Deletes files that are older than specified.
+ *
+ * @param {string} path Path to a collection.
+ * @param {number} expirationDays Number of days representing events lifespan.
  */
 const removeOldFilesFromCollection = async (path, expirationDays) => {
     const filenames = await readdir(path);
@@ -226,7 +237,7 @@ const removeOldFilesFromCollection = async (path, expirationDays) => {
  * Writes metadata to a JSON file.
  *
  * @param {string} path Path to the file.
- * @param {Object} metadata Metadata to write.
+ * @param {object} metadata Metadata to write.
  */
 const writeMetadataToFile = async (path, metadata) => {
     await mkdir(path.substring(0, path.lastIndexOf('/')), { recursive: true });
@@ -240,7 +251,8 @@ const writeMetadataToFile = async (path, metadata) => {
  * Migrates legacy single-object files to an array on read.
  *
  * @param {string} filePath Per-day metadata file path.
- * @returns {Promise<Array<Object>>} Array of metadata records (see PollMetadataRecord).
+ *
+ * @returns {Promise<Array<object>>} Array of metadata records (see PollMetadataRecord).
  */
 const readMetadataRecords = async (filePath) => {
     if (!(await pathExists(filePath))) {
@@ -266,8 +278,8 @@ const readMetadataRecords = async (filePath) => {
  * Migrates legacy single-object files to a two-element array on first
  * append. Treats a corrupted file as empty (warns to stderr).
  *
- * @param {string} filePath  per-day metadata file path
- * @param {Object} record    metadata record (see PollMetadataRecord)
+ * @param {string} filePath Per-day metadata file path.
+ * @param {object} record Metadata record (see PollMetadataRecord).
  */
 const appendMetadataRecord = async (filePath, record) => {
     await mkdir(dirname(filePath), { recursive: true });
@@ -281,7 +293,7 @@ const appendMetadataRecord = async (filePath, record) => {
  * dedupe so the existing id-based dedupe collapses repeats.
  *
  * @param {string} collectionPath Path to the collection root.
- * @param {Array<Object>} events Synthetic events with `id` and `created_at`.
+ * @param {Array<object>} events Synthetic events with `id` and `created_at`.
  */
 const mergeSyntheticEventsIntoCollection = async (collectionPath, events) => {
     if (!events || events.length === 0) {

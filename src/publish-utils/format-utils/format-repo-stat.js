@@ -2,9 +2,11 @@ import { format } from 'date-fns';
 import { getTextBlock } from './get-text-block';
 
 /**
- * Converts general repo stat object to array of Slack blocks
- * @param {Object} repoStat
- * @returns {Object[]}
+ * Converts general repo stat object to array of Slack blocks.
+ *
+ * @param {object} repoStat General repository statistics.
+ *
+ * @returns {object[]} Array of Slack Block Kit blocks.
  */
 export const formatRepoStat = (repoStat) => {
     const {

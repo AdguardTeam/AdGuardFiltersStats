@@ -22,9 +22,9 @@ const X_RATE_LIMIT_REMAINING_HEADER = 'x-ratelimit-remaining';
 /**
  * Get GitHub events from with pagination.
  *
- * @param {Object} commonRequestData Common request data for GitHub API
+ * @param {object} commonRequestData Common request data for GitHub API.
  *
- * @return {Promise<Object>} Object containing events array and metadata
+ * @returns {Promise<object>} Object containing events array and metadata.
  */
 export const getGithubEvents = async (commonRequestData = {}) => {
     const collectedPages = [];
@@ -68,9 +68,11 @@ export const getGithubEvents = async (commonRequestData = {}) => {
         if (error.status === 403 && error.response?.headers?.[X_RATE_LIMIT_REMAINING_HEADER] === '0') {
             rateLimitReached = true;
             rateLimitReset = parseInt(error.response.headers[X_RATE_LIMIT_RESET_HEADER], 10);
-            throw new Error(`GitHub API rate limit exceeded. Limit will reset at ${new Date(rateLimitReset * 1000).toISOString()}`);
+            throw new Error(
+                `GitHub API rate limit exceeded. Limit will reset at ${new Date(rateLimitReset * 1000).toISOString()}`,
+            );
         } else {
-            throw new Error('Error fetching GitHub events:', error.message);
+            throw new Error(`Error fetching GitHub events: ${error.message}`);
         }
     }
 
@@ -85,7 +87,7 @@ export const getGithubEvents = async (commonRequestData = {}) => {
     }
 
     if (totalEvents >= MAX_NUMBER_OF_MOST_RECENT_EVENTS) {
-        // eslint-disable-next-line no-console
+        // eslint-disable-next-line no-console, max-len
         console.warn(`⚠️ GitHub Events API only returns up to ${MAX_NUMBER_OF_MOST_RECENT_EVENTS} most recent events. Some events may be missing.`);
     }
 
@@ -103,8 +105,11 @@ export const getGithubEvents = async (commonRequestData = {}) => {
 };
 
 /**
- * Get open issues with pagination
- * @return {Promise<Array<Object>>} array with open issues
+ * Get open issues with pagination.
+ *
+ * @param {object} commonRequestData Common request data for the GitHub API.
+ *
+ * @returns {Promise<Array<object>>} Array with open issues.
  */
 export const getOpenIssues = async (commonRequestData = {}) => {
     const collectedPages = [];
@@ -131,6 +136,15 @@ export const getOpenIssues = async (commonRequestData = {}) => {
 const ENDPOINT_ISSUES_LIST = 'GET /repos/{owner}/{repo}/issues';
 const ENDPOINT_PULLS_LIST = 'GET /repos/{owner}/{repo}/pulls';
 
+/**
+ * Check if a timestamp falls within the specified time window.
+ *
+ * @param {string} iso ISO 8601 timestamp to check.
+ * @param {string} since Lower bound of the time window (ISO 8601).
+ * @param {string} until Upper bound of the time window (ISO 8601).
+ *
+ * @returns {boolean} True if the timestamp falls within the time window, false otherwise.
+ */
 const inWindow = (iso, since, until) => {
     if (!iso) {
         return false;
@@ -143,9 +157,10 @@ const inWindow = (iso, since, until) => {
  * List closed (true) issues whose `closed_at` falls in the time window.
  * Filters out pull-request rows (GitHub's /issues endpoint mixes them in).
  *
- * @param {{owner: string, repo: string}} commonRequestData
- * @param {{since: string, until: string}} timePeriod
- * @returns {Promise<Array<Object>>}
+ * @param {{owner: string, repo: string}} commonRequestData Common request data for the GitHub API.
+ * @param {{since: string, until: string}} timePeriod Time window with ISO 8601 `since` and `until` bounds.
+ *
+ * @returns {Promise<Array<object>>} Array with closed issues in the time window.
  */
 export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => {
     const { since, until } = timePeriod;
@@ -195,6 +210,11 @@ export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => 
  * List pull requests created or merged within the time window.
  * Walks pages newest-first and stops when `updated_at` falls strictly
  * before `since` (no further matches possible).
+ *
+ * @param {{owner: string, repo: string}} commonRequestData Common request data for the GitHub API.
+ * @param {{since: string, until: string}} timePeriod Time window with ISO 8601 `since` and `until` bounds.
+ *
+ * @returns {Promise<Array<object>>} Array with pull requests in the time window.
  */
 export const getPullsInWindow = async (commonRequestData, timePeriod) => {
     const { since, until } = timePeriod;

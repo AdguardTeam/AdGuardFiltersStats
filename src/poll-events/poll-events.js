@@ -13,11 +13,12 @@ import {
 } from '../tools/fs-utils';
 
 /**
- * Polls events from Github Events API and stores them on a given path
+ * Polls events from Github Events API and stores them on a given path.
  *
- * @param {string} collectionPath path to events collection
- * @param {Object} commonRequestData
- * @returns {Promise<Object>} Collection metadata
+ * @param {string} collectionPath Path to events collection.
+ * @param {object} commonRequestData GitHub API request parameters.
+ *
+ * @returns {Promise<object>} Collection metadata.
  */
 export const pollEvents = async (collectionPath, commonRequestData) => {
     try {
