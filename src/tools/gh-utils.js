@@ -167,7 +167,6 @@ export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => 
         // eslint-disable-next-line no-restricted-syntax
         for (const row of data) {
             if (row.pull_request) {
-                // eslint-disable-next-line no-continue
                 continue;
             }
             // With desc order, once updated_at < since no subsequent issue can

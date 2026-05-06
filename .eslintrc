@@ -19,6 +19,7 @@
         "brace-style": ["error", "1tbs", {
             "allowSingleLine": false
         }],
+        "no-continue": "off",
         "arrow-body-style": "off",
         "no-else-return": "off",
         "import/prefer-default-export": "off"

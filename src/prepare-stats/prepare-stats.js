@@ -11,7 +11,6 @@ const dedupeById = (events) => {
     // eslint-disable-next-line no-restricted-syntax
     for (const e of events) {
         if (!e || !e.id || seen.has(e.id)) {
-            // eslint-disable-next-line no-continue
             continue;
         }
         seen.add(e.id);
