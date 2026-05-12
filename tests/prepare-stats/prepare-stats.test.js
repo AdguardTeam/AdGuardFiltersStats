@@ -26,6 +26,13 @@ jest.mock('../../src/tools/gh-utils', () => {
 import { prepareStats } from '../../src/prepare-stats';
 
 describe('prepareStats — reconciles missing closures from REST', () => {
+    beforeEach(() => {
+        process.env.RECONCILE = 'true';
+    });
+    afterEach(() => {
+        delete process.env.RECONCILE;
+    });
+
     it('counts a user1 resolved issue that was missing from the JSONL', async () => {
         const dir = await mkdtemp(path.join(tmpdir(), 'stats-'));
         await copyFile(
@@ -52,11 +59,16 @@ describe('prepareStats — reconciles missing closures from REST', () => {
 
 describe('prepareStats — hard fail on unrecoverable empty window', () => {
     beforeEach(() => {
+        process.env.RECONCILE = 'true';
         // Force REST to fail
         // eslint-disable-next-line global-require
         const gh = require('../../src/tools/gh-utils');
         gh.getClosedIssuesInWindow.mockRejectedValueOnce(new Error('rate limit'));
         gh.getPullsInWindow.mockRejectedValueOnce(new Error('rate limit'));
+    });
+
+    afterEach(() => {
+        delete process.env.RECONCILE;
     });
 
     it('throws when both the collection is empty and REST is unavailable', async () => {

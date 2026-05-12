@@ -142,29 +142,29 @@ describe('reconcileWindow', () => {
         jest.clearAllMocks();
     });
 
-    it('returns injectedEvents, restRequestsMade: 2, and no error when both requests succeed', async () => {
+    it('returns injectedEvents, endpointsSucceeded: 2, and no error when both requests succeed', async () => {
         getClosedIssuesInWindow.mockResolvedValueOnce([]);
         getPullsInWindow.mockResolvedValueOnce([]);
         const result = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
-        expect(result.restRequestsMade).toBe(2);
+        expect(result.endpointsSucceeded).toBe(2);
         expect(result.error).toBeNull();
         expect(result.injectedEvents).toEqual([]);
     });
 
-    it('returns partial events, restRequestsMade: 1, and error message when one request fails', async () => {
+    it('returns partial events, endpointsSucceeded: 1, and error message when one request fails', async () => {
         getClosedIssuesInWindow.mockRejectedValueOnce(new Error('rate limit'));
         getPullsInWindow.mockResolvedValueOnce([]);
         const result = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
-        expect(result.restRequestsMade).toBe(1);
+        expect(result.endpointsSucceeded).toBe(1);
         expect(result.error).toContain('rate limit');
         expect(result.injectedEvents).toEqual([]);
     });
 
-    it('returns restRequestsMade: 0 and combined error when both requests fail', async () => {
+    it('returns endpointsSucceeded: 0 and combined error when both requests fail', async () => {
         getClosedIssuesInWindow.mockRejectedValueOnce(new Error('issues fail'));
         getPullsInWindow.mockRejectedValueOnce(new Error('pulls fail'));
         const result = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
-        expect(result.restRequestsMade).toBe(0);
+        expect(result.endpointsSucceeded).toBe(0);
         expect(result.error).toContain('issues fail');
         expect(result.error).toContain('pulls fail');
     });

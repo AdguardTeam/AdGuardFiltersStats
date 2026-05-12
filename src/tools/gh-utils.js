@@ -1,9 +1,16 @@
 import { Octokit } from '@octokit/core';
+import { isBefore, isWithinInterval } from 'date-fns';
 import { ENDPOINTS, MAX_NUMBER_OF_MOST_RECENT_EVENTS } from '../constants';
+import { logger } from './logger';
 
 const { GITHUB_TOKEN } = process.env;
 
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
+
+/**
+ * Maximum number of pages to fetch per paginated request to prevent runaway loops.
+ */
+const MAX_PAGES = 30;
 
 /**
  * Header names for rate limit information.
@@ -37,7 +44,6 @@ export const getGithubEvents = async (commonRequestData = {}) => {
         let currentLink = 'rel="next"';
         let pageNumber = 1;
         while (currentLink && currentLink.includes('rel="next"')) {
-            // eslint-disable-next-line no-await-in-loop
             const { headers, data } = await octokit.request(ENDPOINTS.GITHUB_EVENTS, {
                 ...commonRequestData,
                 page: pageNumber,
@@ -56,10 +62,8 @@ export const getGithubEvents = async (commonRequestData = {}) => {
 
             // Check if we're approaching rate limit
             if (rateLimitRemaining < 5) {
-                // eslint-disable-next-line no-console
-                console.warn(`GitHub API rate limit nearly reached. ${rateLimitRemaining} requests remaining.`);
-                // eslint-disable-next-line no-console
-                console.warn(`Rate limit will reset at ${new Date(rateLimitReset * 1000).toISOString()}`);
+                logger.warn(`GitHub API rate limit nearly reached. ${rateLimitRemaining} requests remaining.`);
+                logger.warn(`Rate limit will reset at ${new Date(rateLimitReset * 1000).toISOString()}`);
                 rateLimitReached = true;
                 break;
             }
@@ -77,18 +81,18 @@ export const getGithubEvents = async (commonRequestData = {}) => {
     }
 
     // Log information about the collection
-    // eslint-disable-next-line no-console
-    console.log(`Collected ${totalEvents} events across ${collectedPages.length} pages`);
+    logger.log(`Collected ${totalEvents} events across ${collectedPages.length} pages`);
 
     // Notify if we hit API limitations
     if (rateLimitReached) {
-        // eslint-disable-next-line no-console
-        console.warn('⚠️ Data collection incomplete due to GitHub API rate limiting');
+        logger.warn('⚠️ Data collection incomplete due to GitHub API rate limiting');
     }
 
     if (totalEvents >= MAX_NUMBER_OF_MOST_RECENT_EVENTS) {
-        // eslint-disable-next-line no-console, max-len
-        console.warn(`⚠️ GitHub Events API only returns up to ${MAX_NUMBER_OF_MOST_RECENT_EVENTS} most recent events. Some events may be missing.`);
+        logger.warn(
+            `⚠️ GitHub Events API only returns up to ${MAX_NUMBER_OF_MOST_RECENT_EVENTS} most recent events.`
+            + ' Some events may be missing.',
+        );
     }
 
     return {
@@ -117,7 +121,6 @@ export const getOpenIssues = async (commonRequestData = {}) => {
     let currentLink = 'rel="next"';
     let pageNumber = 1;
     while (currentLink && currentLink.includes('rel="next"')) {
-        // eslint-disable-next-line no-await-in-loop
         const { headers, data } = await octokit.request(ENDPOINTS.ISSUES, {
             ...commonRequestData,
             state: 'open',
@@ -140,17 +143,15 @@ const ENDPOINT_PULLS_LIST = 'GET /repos/{owner}/{repo}/pulls';
  * Check if a timestamp falls within the specified time window.
  *
  * @param {string} iso ISO 8601 timestamp to check.
- * @param {string} since Lower bound of the time window (ISO 8601).
- * @param {string} until Upper bound of the time window (ISO 8601).
+ * @param {{start: Date, end: Date}} interval Pre-computed interval with `start` and `end` Date objects.
  *
  * @returns {boolean} True if the timestamp falls within the time window, false otherwise.
  */
-const inWindow = (iso, since, until) => {
+const inWindow = (iso, interval) => {
     if (!iso) {
         return false;
     }
-    const t = new Date(iso).getTime();
-    return t >= new Date(since).getTime() && t <= new Date(until).getTime();
+    return isWithinInterval(new Date(iso), interval);
 };
 
 /**
@@ -164,12 +165,16 @@ const inWindow = (iso, since, until) => {
  */
 export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => {
     const { since, until } = timePeriod;
-    const sinceMs = new Date(since).getTime();
+    const sinceDate = new Date(since);
+    const interval = { start: sinceDate, end: new Date(until) };
     const collected = [];
     let page = 1;
     let stop = false;
     while (!stop) {
-        // eslint-disable-next-line no-await-in-loop
+        if (page > MAX_PAGES) {
+            logger.warn(`⚠️ Pagination safety limit (${MAX_PAGES} pages) reached for getClosedIssuesInWindow`);
+            break;
+        }
         const { data, headers } = await octokit.request(ENDPOINT_ISSUES_LIST, {
             ...commonRequestData,
             state: 'closed',
@@ -189,11 +194,11 @@ export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => 
             // Do NOT short-circuit on updated_at > until: an issue can have
             // closed_at inside the window but updated_at later (e.g. a comment
             // was added after the window closed).
-            if (new Date(row.updated_at).getTime() < sinceMs) {
+            if (isBefore(new Date(row.updated_at), sinceDate)) {
                 stop = true;
                 break;
             }
-            if (inWindow(row.closed_at, since, until)) {
+            if (inWindow(row.closed_at, interval)) {
                 collected.push(row);
             }
         }
@@ -218,12 +223,16 @@ export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => 
  */
 export const getPullsInWindow = async (commonRequestData, timePeriod) => {
     const { since, until } = timePeriod;
-    const sinceMs = new Date(since).getTime();
+    const sinceDate = new Date(since);
+    const interval = { start: sinceDate, end: new Date(until) };
     const collected = [];
     let page = 1;
     let stop = false;
     while (!stop) {
-        // eslint-disable-next-line no-await-in-loop
+        if (page > MAX_PAGES) {
+            logger.warn(`⚠️ Pagination safety limit (${MAX_PAGES} pages) reached for getPullsInWindow`);
+            break;
+        }
         const { data, headers } = await octokit.request(ENDPOINT_PULLS_LIST, {
             ...commonRequestData,
             state: 'all',
@@ -234,13 +243,12 @@ export const getPullsInWindow = async (commonRequestData, timePeriod) => {
         });
         // eslint-disable-next-line no-restricted-syntax
         for (const pr of data) {
-            const updatedMs = new Date(pr.updated_at).getTime();
-            if (updatedMs < sinceMs) {
+            if (isBefore(new Date(pr.updated_at), sinceDate)) {
                 stop = true;
                 break;
             }
-            const openedIn = inWindow(pr.created_at, since, until);
-            const mergedIn = pr.merged_at && inWindow(pr.merged_at, since, until);
+            const openedIn = inWindow(pr.created_at, interval);
+            const mergedIn = pr.merged_at && inWindow(pr.merged_at, interval);
             if (openedIn || mergedIn) {
                 collected.push(pr);
             }

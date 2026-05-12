@@ -10,7 +10,7 @@ const recA = {
     timestamp: '2026-04-21T01:00:00Z',
     totalEvents: 100,
     pagesCollected: 5,
-    eventsWritten: 100,
+    eventsInFile: 100,
     rateLimitRemaining: 4900,
     rateLimitReached: false,
     rateLimitReset: '2026-04-21T02:00:00Z',

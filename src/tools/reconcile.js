@@ -1,7 +1,22 @@
 import { getClosedIssuesInWindow, getPullsInWindow } from './gh-utils';
 
+/**
+ * Convert an ISO 8601 string to epoch milliseconds.
+ *
+ * @param {string} iso ISO 8601 date string.
+ *
+ * @returns {number} Epoch milliseconds.
+ */
 const epochMs = (iso) => new Date(iso).getTime();
 
+/**
+ * Build a synthetic IssuesEvent for a closed issue.
+ *
+ * @param {object} issue GitHub issue object with `closed_by`, `id`, and `closed_at`.
+ * @param {object} repo Repository metadata object with `id` and `name` fields.
+ *
+ * @returns {object|null} Synthetic IssuesEvent, or null if `closed_by` is missing.
+ */
 const issueClosedEvent = (issue, repo) => {
     if (!issue.closed_by || !issue.closed_by.login) {
         return null;
@@ -16,6 +31,14 @@ const issueClosedEvent = (issue, repo) => {
     };
 };
 
+/**
+ * Build a synthetic PullRequestEvent for an opened pull request.
+ *
+ * @param {object} pr GitHub pull request object with `user`, `id`, and `created_at`.
+ * @param {object} repo Repository metadata object with `id` and `name` fields.
+ *
+ * @returns {object|null} Synthetic PullRequestEvent with action `opened`, or null if `user` is missing.
+ */
 const prOpenedEvent = (pr, repo) => {
     if (!pr.user || !pr.user.login) {
         return null;
@@ -33,6 +56,15 @@ const prOpenedEvent = (pr, repo) => {
     };
 };
 
+/**
+ * Build a synthetic PullRequestEvent for a merged pull request.
+ *
+ * @param {object} pr GitHub pull request object with `user`, `id`, and `merged_at`.
+ * @param {object} repo Repository metadata object with `id` and `name` fields.
+ *
+ * @returns {object|null} Synthetic PullRequestEvent with action `closed` and `merged_at` set,
+ * or null if the PR was not merged or `user` is missing.
+ */
 const prMergedEvent = (pr, repo) => {
     if (!pr.merged_at || !pr.user || !pr.user.login) {
         return null;
@@ -113,8 +145,8 @@ export const buildSyntheticEvents = ({
  * @param {RepoMeta} repoMeta Repository metadata object with `id` and `name` fields,
  * used for synthetic event construction.
  *
- * @returns {Promise<{injectedEvents: Array<object>, restRequestsMade: number, error: string|null}>} Object
- * with synthetic events array, count of successful REST requests, and error message if any.
+ * @returns {Promise<{injectedEvents: Array<object>, endpointsSucceeded: number, error: string|null}>} Object
+ * with synthetic events array, count of successful REST endpoint calls, and error message if any.
  */
 export const reconcileWindow = async (commonRequestData, timePeriod, repoMeta) => {
     const [issuesResult, pullsResult] = await Promise.allSettled([
@@ -123,7 +155,7 @@ export const reconcileWindow = async (commonRequestData, timePeriod, repoMeta) =
     ]);
     const closedIssues = issuesResult.status === 'fulfilled' ? issuesResult.value : [];
     const pulls = pullsResult.status === 'fulfilled' ? pullsResult.value : [];
-    const restRequestsMade = [issuesResult, pullsResult]
+    const endpointsSucceeded = [issuesResult, pullsResult]
         .filter((r) => r.status === 'fulfilled').length;
     const errors = [issuesResult, pullsResult]
         .filter((r) => r.status === 'rejected')
@@ -134,7 +166,7 @@ export const reconcileWindow = async (commonRequestData, timePeriod, repoMeta) =
             // FIXME: add eslint rule to enforce multiline for 3 and more items in object/array literals
             closedIssues, pulls, repo: repoMeta, timePeriod,
         }),
-        restRequestsMade,
+        endpointsSucceeded,
         error,
     };
 };

@@ -4,6 +4,7 @@ import { prepareActivityStat } from './prepare-contributors-stat';
 import { prepareDetailedActivityStat } from './prepare-detailed-activity-stat';
 import { getEventsFromCollection, mergeSyntheticEventsIntoCollection } from '../tools/fs-utils';
 import { reconcileWindow } from '../tools/reconcile';
+import { logger } from '../tools/logger';
 
 const dedupeById = (events) => {
     const seen = new Set();
@@ -35,21 +36,29 @@ export const prepareStats = async (collectionPath, commonRequestData, timePeriod
         id: 0,
         name: `${commonRequestData.owner}/${commonRequestData.repo}`,
     };
-    const reconciliation = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
-    if (reconciliation.error) {
-        // eslint-disable-next-line no-console
-        console.warn(`⚠️ Reconciliation failed: ${reconciliation.error}. Stats may under-report.`);
-    } else if (reconciliation.injectedEvents.length > 0) {
-        // Persist so future reports inherit the recovered events
-        await mergeSyntheticEventsIntoCollection(collectionPath, reconciliation.injectedEvents);
+
+    let injectedEvents = [];
+    let reconcileError = null;
+    if (process.env.RECONCILE === 'true') {
+        const reconciliation = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
+        if (reconciliation.error) {
+            reconcileError = reconciliation.error;
+            logger.warn(`⚠️ Reconciliation failed: ${reconciliation.error}. Stats may under-report.`);
+        } else {
+            injectedEvents = reconciliation.injectedEvents;
+            if (injectedEvents.length > 0) {
+                // Persist so future reports inherit the recovered events
+                await mergeSyntheticEventsIntoCollection(collectionPath, injectedEvents);
+            }
+        }
     }
 
-    const events = dedupeById([...liveEvents, ...reconciliation.injectedEvents]);
+    const events = dedupeById([...liveEvents, ...injectedEvents]);
 
-    if (events.length === 0 && reconciliation.error) {
+    if (events.length === 0 && reconcileError) {
         throw new Error(
             `No events available for window ${timePeriod.since}..${timePeriod.until} `
-            + `and reconciliation failed: ${reconciliation.error}`,
+            + `and reconciliation failed: ${reconcileError}`,
         );
     }
 

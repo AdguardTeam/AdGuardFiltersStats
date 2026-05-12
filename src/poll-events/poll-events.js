@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { getGithubEvents } from '../tools/gh-utils';
 import { reconcileWindow } from '../tools/reconcile';
 import { EVENT_EXPIRATION_DAYS, POLL_GAP_THRESHOLD_MS } from '../constants';
+import { logger } from '../tools/logger';
 import {
     removeOldFilesFromCollection,
     writePollToCollection,
@@ -26,8 +27,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
         const { events, metadata } = await getGithubEvents(commonRequestData);
 
         if (events.length === 0) {
-            // eslint-disable-next-line no-console
-            console.error('No events were collected from GitHub API');
+            logger.error('No events were collected from GitHub API');
             return { success: false, metadata };
         }
 
@@ -65,12 +65,16 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
         if (gapSuspected && gapWindowSince) {
             const gapWindow = { since: gapWindowSince, until: oldestEventAt };
             const repoMeta = { id: 0, name: `${commonRequestData.owner}/${commonRequestData.repo}` };
-            // eslint-disable-next-line function-paren-newline
-            const { injectedEvents, error: backfillError } = await reconcileWindow(
-                commonRequestData, gapWindow, repoMeta);
+            const {
+                injectedEvents,
+                error: backfillError,
+            } = await reconcileWindow(
+                commonRequestData,
+                gapWindow,
+                repoMeta,
+            );
             if (backfillError) {
-                // eslint-disable-next-line no-console
-                console.warn(`⚠️ Gap detected but backfill failed: ${backfillError}`);
+                logger.warn(`⚠️ Gap detected but backfill failed: ${backfillError}`);
             } else if (injectedEvents.length > 0) {
                 await mergeSyntheticEventsIntoCollection(collectionPath, injectedEvents);
             }
@@ -81,7 +85,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
             timestamp: metadata.timestamp,
             totalEvents: metadata.totalEvents,
             pagesCollected: metadata.pagesCollected,
-            eventsWritten: actualEventsWritten,
+            eventsInFile: actualEventsWritten,
             rateLimitRemaining: metadata.rateLimitRemaining,
             rateLimitReached: metadata.rateLimitReached,
             rateLimitReset: metadata.rateLimitReset,
@@ -98,7 +102,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
             success: true,
             metadata: {
                 ...metadata,
-                eventsWritten: actualEventsWritten,
+                eventsInFile: actualEventsWritten,
             },
         };
     } catch (error) {
@@ -110,7 +114,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
                     timestamp: new Date().toISOString(),
                     totalEvents: 0,
                     pagesCollected: 0,
-                    eventsWritten: 0,
+                    eventsInFile: 0,
                     rateLimitRemaining: null,
                     rateLimitReached: false,
                     rateLimitReset: null,
@@ -122,9 +126,11 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
                     repo: `${commonRequestData.owner}/${commonRequestData.repo}`,
                 },
             );
-        } catch (_) { /* swallow secondary IO error */ }
-        // eslint-disable-next-line no-console
-        console.error('Error in pollEvents:', error.message);
+        } catch (metaErr) {
+            // Writing error metadata failed — log and continue so the original error is still reported.
+            logger.error('Failed to persist error metadata:', metaErr.message);
+        }
+        logger.error('Error in pollEvents:', error.message);
         // Return failure status and error information
         return {
             success: false,

@@ -225,7 +225,7 @@ const eventsToActivityByTime = (contributor) => {
 const getActivityAuthor = (event) => {
     const { type, payload, actor } = event;
     const username = actor.login;
-    let contributorName;
+    let contributorName = null;
     switch (type) {
         case EVENT_TYPES.PULL_REQUEST_REVIEW_EVENT:
         case EVENT_TYPES.ISSUE_COMMENT_EVENT:
@@ -254,7 +254,7 @@ const getActivityAuthor = (event) => {
     }
 
     if (contributorName && EXCLUDED_USERNAMES.includes(contributorName)) {
-        return undefined;
+        return null;
     }
 
     return contributorName;
