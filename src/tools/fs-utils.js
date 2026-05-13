@@ -24,6 +24,7 @@ import {
     sortEventsByDate,
 } from './events-utils';
 import { MILLISECONDS_IN_DAY, COLLECTION_FILE_EXTENSION } from '../constants';
+import { logger } from './logger';
 
 /**
  * Check if path exists.
@@ -264,8 +265,7 @@ const readMetadataRecords = async (filePath) => {
     try {
         parsed = JSON.parse(raw);
     } catch {
-        // eslint-disable-next-line no-console
-        console.warn(`⚠️ Metadata file is corrupted (${filePath}), treating as empty.`);
+        logger.warn(`⚠️ Metadata file is corrupted (${filePath}), treating as empty.`);
         return [];
     }
 
