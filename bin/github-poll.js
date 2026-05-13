@@ -4,10 +4,11 @@
 var dotenv = require('dotenv');
 var dateFns = require('date-fns');
 var path = require('path');
-var fsUtils = require('./fs-utils-BKOqaAdC.js');
+var fsUtils = require('./fs-utils-DF186O2_.js');
 require('@octokit/core');
 require('node:fs');
 require('node:fs/promises');
+require('node:path');
 require('stream');
 require('stream-chain');
 require('string_decoder');
@@ -32,11 +33,12 @@ function _interopNamespaceDefault(e) {
 var dotenv__namespace = /*#__PURE__*/_interopNamespaceDefault(dotenv);
 
 /**
- * Polls events from Github Events API and stores them on a given path
+ * Polls events from Github Events API and stores them on a given path.
  *
- * @param {string} collectionPath path to events collection
- * @param {Object} commonRequestData
- * @returns {Promise<Object>} Collection metadata
+ * @param {string} collectionPath Path to events collection.
+ * @param {object} commonRequestData GitHub API request parameters.
+ *
+ * @returns {Promise<object>} Collection metadata.
  */
 const pollEvents = async (collectionPath, commonRequestData) => {
   try {
@@ -46,8 +48,7 @@ const pollEvents = async (collectionPath, commonRequestData) => {
       metadata
     } = await fsUtils.getGithubEvents(commonRequestData);
     if (events.length === 0) {
-      // eslint-disable-next-line no-console
-      console.error('No events were collected from GitHub API');
+      fsUtils.logger.error('No events were collected from GitHub API');
       return {
         success: false,
         metadata
@@ -59,12 +60,63 @@ const pollEvents = async (collectionPath, commonRequestData) => {
     const actualEventsWritten = await fsUtils.removeDupesFromCollection(collectionPath);
     await fsUtils.removeOldFilesFromCollection(collectionPath, fsUtils.EVENT_EXPIRATION_DAYS);
 
-    // Store metadata for diagnostics
+    // Compute event time bounds for gap detection and diagnostics
+    const eventTimes = events.map(e => new Date(e.created_at).getTime());
+    const oldestEventAt = new Date(Math.min(...eventTimes)).toISOString();
+    const newestEventAt = new Date(Math.max(...eventTimes)).toISOString();
+
+    // Read previous metadata to detect gap
     const today = dateFns.format(new Date(), 'yyyy-MM-dd');
     const metadataPath = path.join(collectionPath, `${today}-metadata.json`);
-    await fsUtils.writeMetadataToFile(metadataPath, {
-      ...metadata,
-      eventsWritten: actualEventsWritten,
+    const prevRecords = await fsUtils.readMetadataRecords(metadataPath);
+    const lastSuccessful = prevRecords.filter(r => !r.error).at(-1);
+    let gapSuspected = false;
+    let gapWindowSince = null;
+    if (lastSuccessful) {
+      const msSinceLast = Date.now() - new Date(lastSuccessful.timestamp).getTime();
+      const oldestEventTime = new Date(oldestEventAt).getTime();
+      const lastEventTime = new Date(lastSuccessful.newestEventAt).getTime();
+      const eventBasedGap = lastSuccessful.newestEventAt && oldestEventTime - lastEventTime > fsUtils.POLL_GAP_THRESHOLD_MS;
+      if (msSinceLast > fsUtils.POLL_GAP_THRESHOLD_MS || eventBasedGap) {
+        gapSuspected = true;
+        gapWindowSince = lastSuccessful.newestEventAt || lastSuccessful.timestamp;
+      }
+    }
+
+    // Backfill gap window from REST when a gap is detected
+    if (gapSuspected && gapWindowSince) {
+      const gapWindow = {
+        since: gapWindowSince,
+        until: oldestEventAt
+      };
+      const repoMeta = {
+        id: 0,
+        name: `${commonRequestData.owner}/${commonRequestData.repo}`
+      };
+      const {
+        injectedEvents,
+        error: backfillError
+      } = await fsUtils.reconcileWindow(commonRequestData, gapWindow, repoMeta);
+      if (backfillError) {
+        fsUtils.logger.warn(`⚠️ Gap detected but backfill failed: ${backfillError}`);
+      } else if (injectedEvents.length > 0) {
+        await fsUtils.mergeSyntheticEventsIntoCollection(collectionPath, injectedEvents);
+      }
+    }
+
+    // Store metadata for diagnostics (one record per poll, append-only)
+    await fsUtils.appendMetadataRecord(metadataPath, {
+      timestamp: metadata.timestamp,
+      totalEvents: metadata.totalEvents,
+      pagesCollected: metadata.pagesCollected,
+      eventsInFile: actualEventsWritten,
+      rateLimitRemaining: metadata.rateLimitRemaining,
+      rateLimitReached: metadata.rateLimitReached,
+      rateLimitReset: metadata.rateLimitReset,
+      oldestEventAt,
+      newestEventAt,
+      gapSuspected,
+      error: null,
       collectionPath,
       repo: `${commonRequestData.owner}/${commonRequestData.repo}`
     });
@@ -74,12 +126,32 @@ const pollEvents = async (collectionPath, commonRequestData) => {
       success: true,
       metadata: {
         ...metadata,
-        eventsWritten: actualEventsWritten
+        eventsInFile: actualEventsWritten
       }
     };
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Error in pollEvents:', error.message);
+    const today = dateFns.format(new Date(), 'yyyy-MM-dd');
+    try {
+      await fsUtils.appendMetadataRecord(path.join(collectionPath, `${today}-metadata.json`), {
+        timestamp: new Date().toISOString(),
+        totalEvents: 0,
+        pagesCollected: 0,
+        eventsInFile: 0,
+        rateLimitRemaining: null,
+        rateLimitReached: false,
+        rateLimitReset: null,
+        oldestEventAt: null,
+        newestEventAt: null,
+        gapSuspected: false,
+        error: error.message,
+        collectionPath,
+        repo: `${commonRequestData.owner}/${commonRequestData.repo}`
+      });
+    } catch (metaErr) {
+      // Writing error metadata failed — log and continue so the original error is still reported.
+      fsUtils.logger.error('Failed to persist error metadata:', metaErr.message);
+    }
+    fsUtils.logger.error('Error in pollEvents:', error.message);
     // Return failure status and error information
     return {
       success: false,
@@ -118,7 +190,7 @@ const commonRequestData = {
       // eslint-disable-next-line no-console
       console.log(`✅ Successfully collected ${metadata.totalEvents} events for ${REPO}`);
       // eslint-disable-next-line no-console
-      console.log(`   ${metadata.eventsWritten} unique events written after deduplication`);
+      console.log(`   ${metadata.eventsInFile} unique events written after deduplication`);
       if (metadata.rateLimitReached) {
         // eslint-disable-next-line no-console
         console.warn('⚠️ GitHub API rate limit was reached during collection');

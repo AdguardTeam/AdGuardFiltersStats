@@ -2,12 +2,13 @@
 'use strict';
 
 var dotenv = require('dotenv');
-var prepareStats = require('./prepare-stats-Sqq5DahR.js');
+var prepareStats = require('./prepare-stats-BH8PqQVf.js');
 var dateFns = require('date-fns');
-require('./fs-utils-BKOqaAdC.js');
+require('./fs-utils-DF186O2_.js');
 require('@octokit/core');
 require('node:fs');
 require('node:fs/promises');
+require('node:path');
 require('stream');
 require('stream-chain');
 require('string_decoder');
@@ -36,9 +37,12 @@ const repoStatToString = repoStats => {
     until,
     since
   } = repoStats.timePeriod;
+  const fromStr = dateFns.format(new Date(since), 'yyy-MM-dd HH-mm-ss');
+  const untilStr = dateFns.format(new Date(until), 'yyy-MM-dd HH-mm-ss');
+  const periodString = `from ${fromStr} to ${untilStr}`;
   const statString = `
     ## General repo statistics \n
-    Repo statistics for the period from ${dateFns.format(new Date(since), 'yyy-MM-dd HH-mm-ss')} to ${dateFns.format(new Date(until), 'yyy-MM-dd HH-mm-ss')}. \n
+    Repo statistics for the period ${periodString}. \n
     * New issues: ${repoStats.newIssues}
     * Resolved issues: ${repoStats.resolvedIssues}
     * Closed as stale: ${repoStats.closedAsStaleIssues}
@@ -81,7 +85,6 @@ const hourlyActivityToString = (hourlyContributorActivity, date) => {
 };
 const activityByTimeToString = activitiesByTime => {
   let activityByTimeString = '\n*Daily activity*';
-  // eslint-disable-next-line no-restricted-syntax
   for (const [date, activities] of Object.entries(activitiesByTime)) {
     activityByTimeString += hourlyActivityToString(activities, date);
   }
@@ -89,8 +92,6 @@ const activityByTimeToString = activitiesByTime => {
 };
 const detailedActivityToString = (activitiesByUser, activitiesByTime) => {
   let statString = '\n## Detailed contributor statistics';
-
-  // eslint-disable-next-line no-restricted-syntax
   for (const [name, activities] of Object.entries(activitiesByUser)) {
     let contributorString = `
         \n\n### ${name}\n
@@ -109,9 +110,9 @@ const detailedActivityToString = (activitiesByUser, activitiesByTime) => {
 /* eslint-disable no-console */
 
 /**
- * Prepares statistics strings and prints them to console
+ * Prepares statistics strings and prints them to console.
  *
- * @param {Object} statistics
+ * @param {object} statistics Aggregated statistics object.
  */
 const printStats = statistics => {
   const {

@@ -3,12 +3,13 @@
 
 var dotenv = require('dotenv');
 var dateFns = require('date-fns');
-var prepareStats = require('./prepare-stats-Sqq5DahR.js');
-var fsUtils = require('./fs-utils-BKOqaAdC.js');
+var prepareStats = require('./prepare-stats-BH8PqQVf.js');
+var fsUtils = require('./fs-utils-DF186O2_.js');
 var webApi = require('@slack/web-api');
 require('@octokit/core');
 require('node:fs');
 require('node:fs/promises');
+require('node:path');
 require('stream');
 require('stream-chain');
 require('string_decoder');
@@ -33,11 +34,13 @@ function _interopNamespaceDefault(e) {
 var dotenv__namespace = /*#__PURE__*/_interopNamespaceDefault(dotenv);
 
 /**
- * Creates block with given params
- * @param {string} text
- * @param {string} textType
- * @param {string} blockType
- * @returns {Object}
+ * Creates block with given params.
+ *
+ * @param {string} text Block text content.
+ * @param {string} textType Slack text type.
+ * @param {string} blockType Slack block type.
+ *
+ * @returns {object} Slack Block Kit block object.
  */
 const getTextBlock = (text, textType = 'mrkdwn', blockType = 'section') => {
   return {
@@ -50,25 +53,31 @@ const getTextBlock = (text, textType = 'mrkdwn', blockType = 'section') => {
 };
 
 /**
- * Check if given user is from own team
- * @param {string} username
- * @returns {boolean}
+ * Check if given user is from own team.
+ *
+ * @param {string} username GitHub username.
+ *
+ * @returns {boolean} True if username is in the team members list.
  */
 const isTeamMember = username => fsUtils.TEAM_MEMBERS.includes(username);
 
 /**
- * Returns icon code
- * @param {string} username
- * @return {string}
+ * Returns icon code.
+ *
+ * @param {string} username GitHub username.
+ *
+ * @returns {string} Slack emoji code for the user icon.
  */
 const getUserIcon = username => {
   return isTeamMember(username) ? ':adguard:' : ':bust_in_silhouette:';
 };
 
 /**
- * Converts contributor's stats to an array of formatted block messages
- * @param {Object} activitiesByUser activity sorted by users and then by type
- * @returns {Array[]}
+ * Converts contributor's stats to an array of formatted block messages.
+ *
+ * @param {object} activitiesByUser Activity sorted by users and then by type.
+ *
+ * @returns {Array<object[]>} Array of per-user Slack block arrays.
  */
 const formatUserActivity = activitiesByUser => {
   const userBlocks = [];
@@ -101,9 +110,11 @@ const TEAM_MEMBERS_STAT_HEADER = ':adguard: *AdGuard team*';
 const CONTRIBUTORS_STAT_HEADER = ':bust_in_silhouette: *Contributors*';
 
 /**
- * Converts activity stat object to an array of Slack blocks
- * @param {Object} activityStat
- * @returns {Object[]}
+ * Converts activity stat object to an array of Slack blocks.
+ *
+ * @param {object} activityStat Activity statistics keyed by username.
+ *
+ * @returns {object[]} Array of Slack Block Kit blocks.
  */
 const formatActivityStat = activityStat => {
   // Render empty block if message url is not supplied
@@ -137,10 +148,12 @@ const formatActivityStat = activityStat => {
 };
 
 /**
- * Prune statistics object to exclude users by given params
- * @param {Object} statistics
- * @param {number} minActivity
- * @returns {Object}
+ * Prune statistics object to exclude users by given params.
+ *
+ * @param {object} statistics Aggregated statistics object.
+ * @param {number} minActivity Minimum activity threshold.
+ *
+ * @returns {object} Pruned statistics object.
  */
 const pruneStatistics = (statistics, minActivity) => {
   const prunedStat = {
@@ -150,8 +163,6 @@ const pruneStatistics = (statistics, minActivity) => {
     activityStat,
     activitiesByUser
   } = prunedStat;
-
-  // eslint-disable-next-line no-restricted-syntax
   for (const [username, count] of Object.entries(activityStat)) {
     const shouldBeRemoved = count <= minActivity || fsUtils.EXCLUDED_USERNAMES.includes(username);
     if (shouldBeRemoved && !isTeamMember(username)) {
@@ -163,9 +174,11 @@ const pruneStatistics = (statistics, minActivity) => {
 };
 
 /**
- * Converts general repo stat object to array of Slack blocks
- * @param {Object} repoStat
- * @returns {Object[]}
+ * Converts general repo stat object to array of Slack blocks.
+ *
+ * @param {object} repoStat General repository statistics.
+ *
+ * @returns {object[]} Array of Slack Block Kit blocks.
  */
 const formatRepoStat = repoStat => {
   const {
@@ -183,20 +196,24 @@ const formatRepoStat = repoStat => {
 };
 
 /**
- * Create authorized Web Client instance
- * @param {string} oauthToken
- * @returns {Object} Slack WebClient instance
+ * Create authorized Web Client instance.
+ *
+ * @param {string} oauthToken Slack OAuth token.
+ *
+ * @returns {object} Slack WebClient instance.
  */
 const makeClient = oauthToken => new webApi.WebClient(oauthToken, {
   logLevel: webApi.LogLevel.DEBUG
 });
 
 /**
- * Post a message to a channel your app is in
- * @param {Object} client Slack WebClient instance
- * @param {Object[]} message array of formatted blocks
- * @param {string} channelId
- * @returns {Object} object with data about sent message
+ * Post a message to a channel your app is in.
+ *
+ * @param {object} client Slack WebClient instance.
+ * @param {object[]} message Array of formatted blocks.
+ * @param {string} channelId Slack channel ID.
+ *
+ * @returns {object} Object with data about sent message.
  */
 async function publishMessage(client, message, channelId) {
   let messageInfo;
@@ -215,11 +232,12 @@ async function publishMessage(client, message, channelId) {
 }
 
 /**
- * Reply to a message with the channel ID and message TS
- * @param {Object} client Slack WebClient instance
- * @param {Object[]} message array of formatted blocks
- * @param {string} channelId
- * @param {string} threadTs id of a thread's parent message
+ * Reply to a message with the channel ID and message TS.
+ *
+ * @param {object} client Slack WebClient instance.
+ * @param {object[]} message Array of formatted blocks.
+ * @param {string} channelId Slack channel ID.
+ * @param {string} threadTs ID of a thread's parent message.
  */
 async function replyMessage(client, message, channelId, threadTs) {
   try {
@@ -237,10 +255,11 @@ async function replyMessage(client, message, channelId, threadTs) {
 }
 
 /**
- * Prepare and publish statistics data to a Slack channel
- * @param {string} oauthToken
- * @param {string} channelId
- * @param {Object} statistics
+ * Prepare and publish statistics data to a Slack channel.
+ *
+ * @param {string} oauthToken Slack OAuth token.
+ * @param {string} channelId Slack channel ID.
+ * @param {object} statistics Aggregated statistics object.
  */
 const publishStats = async (oauthToken, channelId, statistics) => {
   const {
