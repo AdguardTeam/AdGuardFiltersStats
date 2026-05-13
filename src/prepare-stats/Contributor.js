@@ -33,7 +33,6 @@ export class Contributor {
      */
     countTotalActivity() {
         let activityCount = 0;
-        // eslint-disable-next-line no-restricted-syntax
         for (const eventType of Object.keys(this.events)) {
             if (eventType === EVENT_TYPES.PUSH_EVENT) {
                 // Extract commits from PushEvents to count them separately

@@ -108,14 +108,12 @@ export const buildSyntheticEvents = ({
     const sinceMs = new Date(since).getTime();
     const untilMs = new Date(until).getTime();
     const events = [];
-    // eslint-disable-next-line no-restricted-syntax
     for (const issue of closedIssues) {
         const ev = issueClosedEvent(issue, repo);
         if (ev) {
             events.push(ev);
         }
     }
-    // eslint-disable-next-line no-restricted-syntax
     for (const pr of pulls) {
         // Only emit an opened event when the PR was created within the window.
         // getPullsInWindow also returns PRs opened before `since` that were

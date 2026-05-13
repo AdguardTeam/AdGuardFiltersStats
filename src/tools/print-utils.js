@@ -63,7 +63,6 @@ const hourlyActivityToString = (hourlyContributorActivity, date) => {
 
 const activityByTimeToString = (activitiesByTime) => {
     let activityByTimeString = '\n*Daily activity*';
-    // eslint-disable-next-line no-restricted-syntax
     for (const [date, activities] of Object.entries(activitiesByTime)) {
         activityByTimeString += hourlyActivityToString(activities, date);
     }
@@ -74,7 +73,6 @@ const activityByTimeToString = (activitiesByTime) => {
 const detailedActivityToString = (activitiesByUser, activitiesByTime) => {
     let statString = '\n## Detailed contributor statistics';
 
-    // eslint-disable-next-line no-restricted-syntax
     for (const [name, activities] of Object.entries(activitiesByUser)) {
         let contributorString = `
         \n\n### ${name}\n

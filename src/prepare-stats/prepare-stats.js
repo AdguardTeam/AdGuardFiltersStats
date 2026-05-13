@@ -9,7 +9,6 @@ import { logger } from '../tools/logger';
 const dedupeById = (events) => {
     const seen = new Set();
     const out = [];
-    // eslint-disable-next-line no-restricted-syntax
     for (const e of events) {
         if (!e || !e.id || seen.has(e.id)) {
             continue;

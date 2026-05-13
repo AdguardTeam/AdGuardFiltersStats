@@ -184,7 +184,6 @@ export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => 
             per_page: 100,
             page,
         });
-        // eslint-disable-next-line no-restricted-syntax
         for (const row of data) {
             if (row.pull_request) {
                 continue;
@@ -241,7 +240,6 @@ export const getPullsInWindow = async (commonRequestData, timePeriod) => {
             per_page: 100,
             page,
         });
-        // eslint-disable-next-line no-restricted-syntax
         for (const pr of data) {
             if (isBefore(new Date(pr.updated_at), sinceDate)) {
                 stop = true;

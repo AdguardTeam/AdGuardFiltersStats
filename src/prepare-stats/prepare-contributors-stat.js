@@ -7,7 +7,6 @@
  */
 const prepareActivityStat = (contributors) => {
     const generalContributorStats = {};
-    // eslint-disable-next-line no-restricted-syntax
     for (const name of Object.keys(contributors)) {
         generalContributorStats[name] = contributors[name].countTotalActivity();
     }

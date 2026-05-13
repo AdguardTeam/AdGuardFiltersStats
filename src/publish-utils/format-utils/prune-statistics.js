@@ -19,7 +19,6 @@ export const pruneStatistics = (statistics, minActivity) => {
         activitiesByUser,
     } = prunedStat;
 
-    // eslint-disable-next-line no-restricted-syntax
     for (const [username, count] of Object.entries(activityStat)) {
         const shouldBeRemoved = count <= minActivity || EXCLUDED_USERNAMES.includes(username);
         if (shouldBeRemoved && !isTeamMember(username)) {

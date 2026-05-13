@@ -207,7 +207,6 @@ const eventsToActivityByTime = (contributor) => {
     });
 
     // Sort daily arrays by hour
-    // eslint-disable-next-line no-restricted-syntax
     for (const [name, events] of Object.entries(sortedEvents)) {
         sortedEvents[name] = sortEventsByHour(events);
     }

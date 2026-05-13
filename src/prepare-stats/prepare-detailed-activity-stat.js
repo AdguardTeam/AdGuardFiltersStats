@@ -13,7 +13,6 @@ export const prepareDetailedActivityStat = (contributors) => {
     const activitiesByUser = {};
     // Activities amount by username, date and hour
     const activitiesByTime = {};
-    // eslint-disable-next-line no-restricted-syntax
     for (const [name, events] of Object.entries(contributors)) {
         activitiesByTime[name] = eventsToActivityByTime(events);
 
