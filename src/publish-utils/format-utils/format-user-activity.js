@@ -2,9 +2,11 @@ import { getTextBlock } from './get-text-block';
 import { getUserIcon } from './get-user-icon';
 
 /**
- * Converts contributor's stats to an array of formatted block messages
- * @param {Object} activitiesByUser activity sorted by users and then by type
- * @returns {Array[]}
+ * Converts contributor's stats to an array of formatted block messages.
+ *
+ * @param {object} activitiesByUser Activity sorted by users and then by type.
+ *
+ * @returns {Array<object[]>} Array of per-user Slack block arrays.
  */
 export const formatUserActivity = (activitiesByUser) => {
     const userBlocks = [];

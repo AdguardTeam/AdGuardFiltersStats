@@ -1,0 +1,16 @@
+[
+  {
+    "id": 5001,
+    "number": 300,
+    "created_at": "2026-04-21T08:00:00Z",
+    "merged_at": "2026-04-21T09:00:00Z",
+    "user": { "id": 100, "login": "user1" }
+  },
+  {
+    "id": 5002,
+    "number": 301,
+    "created_at": "2026-04-21T10:00:00Z",
+    "merged_at": null,
+    "user": { "id": 200, "login": "user2" }
+  }
+]

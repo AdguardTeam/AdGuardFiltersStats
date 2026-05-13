@@ -1,10 +1,12 @@
 .DS_Store
 .env
 .vscode/
-node_modules
+node_modules/
 yarn-error.log
 
 bin/*
 !bin/github-poll.js
 !bin/github-publish.js
 !bin/github-stats.js
+
+.eslintcache

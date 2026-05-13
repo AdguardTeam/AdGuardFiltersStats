@@ -51,6 +51,19 @@ deduplication, and rate-limit status.
 If `UNTIL` is omitted, the current time is used. Daily files older than
 30 days are automatically pruned during `github-poll`.
 
+### Stats accuracy
+
+`github-publish` performs a **publish-time reconciliation** against the
+GitHub REST API for the requested window. This recovers issue closures
+and PR open/merge events that were missed by the Events-API poller
+(the Events API only retains the 300 most recent public events). When
+the REST API is unavailable the publisher emits a warning; if the
+window is also empty in the local collection it exits non-zero rather
+than producing an under-reported message.
+
+Per-poll diagnostics are appended to `<date>-metadata.json` (one
+record per poll) so polling gaps can be analyzed after the fact.
+
 ## <a id="how-to-install"></a> Installation
 
 Install globally via npm:
@@ -108,14 +121,23 @@ same day is safe and idempotent.
 
 #### Metadata fields
 
-| Field                | Description                               |
-| -------------------- | ----------------------------------------- |
-| `totalEvents`        | Events fetched from GitHub API            |
-| `eventsWritten`      | Unique events written after deduplication |
-| `pagesCollected`     | Number of API pages processed             |
-| `rateLimitReached`   | Whether the API rate limit was hit        |
-| `rateLimitRemaining` | Remaining API requests                    |
-| `rateLimitReset`     | Timestamp when the rate limit resets      |
+The `YYYY-MM-DD-metadata.json` sidecar contains a JSON **array** of records, one per
+poll run. (Legacy files written as a single object are automatically migrated to an array
+on the next poll.)
+
+| Field                | Description                                                           |
+| -------------------- | --------------------------------------------------------------------- |
+| `timestamp`          | ISO 8601 time when this poll ran                                      |
+| `totalEvents`        | Events fetched from GitHub API                                        |
+| `eventsInFile`       | Unique events written after deduplication                             |
+| `pagesCollected`     | Number of API pages processed                                         |
+| `rateLimitReached`   | Whether the API rate limit was hit                                    |
+| `rateLimitRemaining` | Remaining API requests at poll time                                   |
+| `rateLimitReset`     | ISO 8601 timestamp when the rate limit resets                         |
+| `oldestEventAt`      | `created_at` of the oldest event returned by this poll                |
+| `newestEventAt`      | `created_at` of the newest event returned by this poll                |
+| `gapSuspected`       | `true` if no successful poll for >90 min or event window gap detected |
+| `error`              | Error message if the poll failed, otherwise `null`                    |
 
 ### Print stats in console
 
@@ -152,13 +174,14 @@ entries load a `.env` file from the working directory if one exists.
 
 ### Common variables
 
-| Variable          | Required for                  | Description                                                                                |
-| ----------------- | ----------------------------- | ------------------------------------------------------------------------------------------ |
-| `COLLECTION_PATH` | All commands                  | Directory for daily JSONL files and metadata sidecars.                                     |
-| `REPO`            | All commands                  | Target repository in `owner/repo_name` form.                                               |
-| `GITHUB_TOKEN`    | `poll` (recommended), `stats`, `publish` | GitHub Personal Access Token. Raises the API rate limit from 60 to 5000 requests per hour. |
-| `SINCE`           | `stats`, `publish`            | Lower bound of the time window (ISO 8601). All stored events are used if omitted.          |
-| `UNTIL`           | `stats`, `publish`            | Upper bound of the time window (ISO 8601). Defaults to now if omitted.                     |
+| Variable          | Required for                             | Description                                                                                                       |
+| ----------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `COLLECTION_PATH` | All commands                             | Directory for daily JSONL files and metadata sidecars.                                                            |
+| `REPO`            | All commands                             | Target repository in `owner/repo_name` form.                                                                      |
+| `GITHUB_TOKEN`    | `poll` (recommended), `stats`, `publish` | GitHub Personal Access Token. Raises the API rate limit from 60 to 5000 requests per hour.                        |
+| `SINCE`           | `stats`, `publish`                       | Lower bound of the time window (ISO 8601). All stored events are used if omitted.                                 |
+| `UNTIL`           | `stats`, `publish`                       | Upper bound of the time window (ISO 8601). Defaults to now if omitted.                                            |
+| `RECONCILE`       | —                                        | Set to `true` to back-fill missing events from the GitHub REST API during `stats`/`publish`. Disabled by default. |
 
 ### Publishing variables
 

@@ -29,7 +29,7 @@ const commonRequestData = {
             // eslint-disable-next-line no-console
             console.log(`✅ Successfully collected ${metadata.totalEvents} events for ${REPO}`);
             // eslint-disable-next-line no-console
-            console.log(`   ${metadata.eventsWritten} unique events written after deduplication`);
+            console.log(`   ${metadata.eventsInFile} unique events written after deduplication`);
 
             if (metadata.rateLimitReached) {
                 // eslint-disable-next-line no-console

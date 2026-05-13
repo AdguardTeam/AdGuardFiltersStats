@@ -3,26 +3,33 @@ import {
     EVENT_TYPES,
     LABEL_NAMES,
     ACTION_NAMES,
+    EXCLUDED_USERNAMES,
 } from '../constants';
 
 /**
- * Determines if Github event is 'opened'
- * @param {Object} e github event object
- * @return {boolean}
+ * Determines if Github event is 'opened'.
+ *
+ * @param {object} e GitHub event object.
+ *
+ * @returns {boolean} True if event action is opened.
  */
 const isOpenedAction = (e) => e.payload.action === ACTION_NAMES.OPENED;
 
 /**
- * Determines if Github event is 'closed'
- * @param {Object} e github event object
- * @return {boolean}
+ * Determines if Github event is 'closed'.
+ *
+ * @param {object} e GitHub event object.
+ *
+ * @returns {boolean} True if event action is closed.
  */
 const isClosedAction = (e) => e.payload.action === ACTION_NAMES.CLOSED;
 
 /**
- * Determines if Github issue has Stale label
- * @param {Object} issue github issue object
- * @return {boolean}
+ * Determines if Github issue has Stale label.
+ *
+ * @param {object} issue GitHub issue object.
+ *
+ * @returns {boolean} True if issue has a stale label.
  */
 const isStale = (issue) => {
     const { labels } = issue;
@@ -33,9 +40,11 @@ const isStale = (issue) => {
 };
 
 /**
- * Determines if pull request is merged
- * @param {Object} pull github pull object
- * @return {boolean}
+ * Determines if pull request is merged.
+ *
+ * @param {object} pull GitHub pull request event object.
+ *
+ * @returns {boolean} True if the pull request has been merged.
  */
 const isMerged = (pull) => {
     const mergeTime = pull.payload.pull_request.merged_at;
@@ -43,11 +52,12 @@ const isMerged = (pull) => {
 };
 
 /**
- * Checks if GitHub Event object was created since time specified
+ * Checks if GitHub Event object was created since time specified.
  *
- * @param {object} event GitHub API response object
- * @param {string} searchTime timestamp in ISO 8601 format: YYYY-MM-DDTHH:MM:SS
- * @return {boolean}
+ * @param {object} event GitHub API response object.
+ * @param {string} searchTime Timestamp in ISO 8601 format.
+ *
+ * @returns {boolean} True if event was created at or after searchTime.
  */
 const isCreatedSince = (event, searchTime) => {
     if (!searchTime) {
@@ -61,11 +71,12 @@ const isCreatedSince = (event, searchTime) => {
 };
 
 /**
- * Checks if GitHub Event object was created until time specified
+ * Checks if GitHub Event object was created until time specified.
  *
- * @param {object} event GitHub API response object
- * @param {string} searchTime timestamp in ISO 8601 format: YYYY-MM-DDTHH:MM:SS
- * @return {boolean}
+ * @param {object} event GitHub API response object.
+ * @param {string} searchTime Timestamp in ISO 8601 format.
+ *
+ * @returns {boolean} True if event was created at or before searchTime.
  */
 const isCreatedUntil = (event, searchTime) => {
     if (!searchTime) {
@@ -79,10 +90,11 @@ const isCreatedUntil = (event, searchTime) => {
 };
 
 /**
- * Counts commits in given PushEvents
+ * Counts commits in given PushEvents.
  *
- * @param {Array<Object>} pushEvents array with PushEvents
- * @return {number}
+ * @param {Array<object>} pushEvents Array with PushEvents.
+ *
+ * @returns {number} Total number of commits.
  */
 const getCommitsCount = (pushEvents) => {
     const commitsCount = pushEvents.reduce((acc, event) => {
@@ -95,10 +107,12 @@ const getCommitsCount = (pushEvents) => {
 };
 
 /**
- * Counts events of specified type for contributor
- * @param {Object} contributor contributor events object
- * @param {string} eventType event type as per Github events doc
- * @return {number}
+ * Counts events of specified type for contributor.
+ *
+ * @param {object} contributor Contributor events object.
+ * @param {string} eventType Event type as per GitHub events doc.
+ *
+ * @returns {number} Count of events of the specified type.
  */
 const countEventsByType = (contributor, eventType) => {
     if (eventType === EVENT_TYPES.NEW_PULL_EVENT
@@ -115,7 +129,7 @@ const countEventsByType = (contributor, eventType) => {
         const mergedPullsCount = contributor
             .events
             .PullRequestEvent
-            .filter((event) => !isMerged(event))
+            .filter((event) => isMerged(event))
             .length;
         return mergedPullsCount;
     }
@@ -130,9 +144,11 @@ const countEventsByType = (contributor, eventType) => {
 };
 
 /**
- * Sort events by date of creation
- * @param {Array<Object>} events
- * @return {Object<Array<Object>>}
+ * Sort events by date of creation.
+ *
+ * @param {Array<object>} events Array of GitHub events.
+ *
+ * @returns {object} Events grouped by YYYY-MM-DD date.
  */
 const sortEventsByDate = (events) => {
     const sortedEvents = {};
@@ -148,9 +164,11 @@ const sortEventsByDate = (events) => {
 };
 
 /**
- * Modify events array so index reflects events create hour
- * @param {Array} events
- * @return {Array<Array<number>>} hourly activity array
+ * Modify events array so index reflects events create hour.
+ *
+ * @param {Array<object>} events Array of GitHub events.
+ *
+ * @returns {Array<number>} Hourly activity counts.
  */
 const sortEventsByHour = (events) => {
     const eventsByHour = [];
@@ -170,9 +188,11 @@ const sortEventsByHour = (events) => {
 };
 
 /**
- * Sort events of given contributor by YYYY-MM-DD date and then by hour
- * @param {Object} contributor contributor events object
- * @return {Object}
+ * Sort events of given contributor by YYYY-MM-DD date and then by hour.
+ *
+ * @param {object} contributor Contributor events object.
+ *
+ * @returns {object} Events sorted by date, then by hour.
  */
 const eventsToActivityByTime = (contributor) => {
     const allEvents = Object.values(contributor.events).flat();
@@ -187,7 +207,6 @@ const eventsToActivityByTime = (contributor) => {
     });
 
     // Sort daily arrays by hour
-    // eslint-disable-next-line no-restricted-syntax
     for (const [name, events] of Object.entries(sortedEvents)) {
         sortedEvents[name] = sortEventsByHour(events);
     }
@@ -196,14 +215,16 @@ const eventsToActivityByTime = (contributor) => {
 };
 
 /**
- * Checks if event counts as activity and returns corresponding contributor
- * @param {Object} events array with GitHub event objects
- * @return {string|undefined} returns author name for activities and undefined for other events
+ * Checks if event counts as activity and returns corresponding contributor.
+ *
+ * @param {object} event GitHub event object.
+ *
+ * @returns {string|undefined} Author name for activities, undefined otherwise.
  */
 const getActivityAuthor = (event) => {
     const { type, payload, actor } = event;
     const username = actor.login;
-    let contributorName;
+    let contributorName = null;
     switch (type) {
         case EVENT_TYPES.PULL_REQUEST_REVIEW_EVENT:
         case EVENT_TYPES.ISSUE_COMMENT_EVENT:
@@ -229,6 +250,10 @@ const getActivityAuthor = (event) => {
         }
         default:
             break;
+    }
+
+    if (contributorName && EXCLUDED_USERNAMES.includes(contributorName)) {
+        return null;
     }
 
     return contributorName;

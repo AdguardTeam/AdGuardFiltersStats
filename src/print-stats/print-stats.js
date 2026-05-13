@@ -6,9 +6,9 @@ import {
 } from '../tools/print-utils';
 
 /**
- * Prepares statistics strings and prints them to console
+ * Prepares statistics strings and prints them to console.
  *
- * @param {Object} statistics
+ * @param {object} statistics Aggregated statistics object.
  */
 export const printStats = (statistics) => {
     const {

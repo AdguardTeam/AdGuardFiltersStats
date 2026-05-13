@@ -5,7 +5,9 @@ import {
     readdir,
     mkdir,
     writeFile,
+    readFile,
 } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import {
     format,
     endOfYesterday,
@@ -22,6 +24,7 @@ import {
     sortEventsByDate,
 } from './events-utils';
 import { MILLISECONDS_IN_DAY, COLLECTION_FILE_EXTENSION } from '../constants';
+import { logger } from './logger';
 
 /**
  * Check if path exists.
@@ -40,10 +43,12 @@ const pathExists = async (path) => {
 };
 
 /**
- * Gets array of GitHub event objects from file and by timePeriod
- * @param {string} path path to the file to read from
- * @param {object} timePeriod
- * @return {Promise<Array<Object>>} array with GitHub event objects
+ * Gets array of GitHub event objects from file and by timePeriod.
+ *
+ * @param {string} path Path to the file to read from.
+ * @param {object} timePeriod Time window with since and until.
+ *
+ * @returns {Promise<Array<object>>} Array with GitHub event objects.
  */
 const getEventsFromFile = async (path, timePeriod) => {
     const { until, since } = timePeriod;
@@ -73,10 +78,12 @@ const getEventsFromFile = async (path, timePeriod) => {
 };
 
 /**
- * Gets array of GitHub event objects from collection and by search time
- * @param {string} path path to collection dir
- * @param {object} timePeriod
- * @return {Promise<Array<Object>>} array with GitHub event objects
+ * Gets array of GitHub event objects from collection and by search time.
+ *
+ * @param {string} path Path to collection dir.
+ * @param {object} timePeriod Time window with since and until.
+ *
+ * @returns {Promise<Array<object>>} Array with GitHub event objects.
  */
 const getEventsFromCollection = async (path, timePeriod) => {
     const hasDir = await pathExists(path);
@@ -99,38 +106,46 @@ const getEventsFromCollection = async (path, timePeriod) => {
 };
 
 /**
- * Writes events from array to path as a stream, path is created if there is none
- * @param {string} path path to a file
- * @param {Array.<Object>} events array with GitHub event objects
- * @param {string} flag node flag for write stream
+ * Writes events from array to path as a stream, path is created if there is none.
+ *
+ * @param {string} path Path to a file.
+ * @param {Array.<object>} events Array with GitHub event objects.
+ * @param {string} flag Node flag for write stream.
  */
 const writeEventsToFile = async (path, events, flag) => {
     if (events.length === 0) {
         return;
     }
 
-    const readable = new Readable({
-        objectMode: true,
-        read: () => { },
-    });
+    await new Promise((resolve, reject) => {
+        const readable = new Readable({
+            objectMode: true,
+            read: () => { },
+        });
 
-    chain([
-        readable,
-        (event) => `${JSON.stringify(event)}\n`,
-        createWriteStream(path, {
-            flags: flag,
-        }),
-    ]);
+        const writeStream = createWriteStream(path, { flags: flag });
+        writeStream.on('finish', resolve);
+        writeStream.on('error', reject);
+        readable.on('error', reject);
 
-    events.forEach((event) => {
-        readable.push(event);
+        chain([
+            readable,
+            (event) => `${JSON.stringify(event)}\n`,
+            writeStream,
+        ]);
+
+        events.forEach((event) => {
+            readable.push(event);
+        });
+        readable.push(null);
     });
 };
 
 /**
- * Sort events by date of creation and write them to a corresponding file
- * @param {string} path path to collection dir
- * @param {Array<Object>} events array with GitHub event objects
+ * Sort events by date of creation and write them to a corresponding file.
+ *
+ * @param {string} path Path to collection dir.
+ * @param {Array<object>} events Array with GitHub event objects.
  */
 const writePollToCollection = async (path, events) => {
     await mkdir(path, { recursive: true });
@@ -142,9 +157,11 @@ const writePollToCollection = async (path, events) => {
 };
 
 /**
- * Remove duplicate events from a file
- * @param {string} path path to a file
- * @returns {Promise<number>} number of unique events after deduplication
+ * Remove duplicate events from a file.
+ *
+ * @param {string} path Path to a file.
+ *
+ * @returns {Promise<number>} Number of unique events after deduplication.
  */
 const removeDupesFromFile = async (path) => {
     const hasFile = await pathExists(path);
@@ -175,9 +192,11 @@ const removeDupesFromFile = async (path) => {
 };
 
 /**
- * Remove duplicate events from collection
- * @param {string} path path to a collection
- * @returns {Promise<number>} number of unique events in today's file after deduplication
+ * Remove duplicate events from collection.
+ *
+ * @param {string} path Path to a collection.
+ *
+ * @returns {Promise<number>} Number of unique events in today's file after deduplication.
  */
 const removeDupesFromCollection = async (path) => {
     const hasCollection = await pathExists(path);
@@ -195,9 +214,10 @@ const removeDupesFromCollection = async (path) => {
 };
 
 /**
- * Deletes files that are older than specified
- * @param {string} path path to a collection
- * @param {number} expirationDays number of days representing events lifespan
+ * Deletes files that are older than specified.
+ *
+ * @param {string} path Path to a collection.
+ * @param {number} expirationDays Number of days representing events lifespan.
  */
 const removeOldFilesFromCollection = async (path, expirationDays) => {
     const filenames = await readdir(path);
@@ -218,12 +238,77 @@ const removeOldFilesFromCollection = async (path, expirationDays) => {
  * Writes metadata to a JSON file.
  *
  * @param {string} path Path to the file.
- * @param {Object} metadata Metadata to write.
+ * @param {object} metadata Metadata to write.
  */
 const writeMetadataToFile = async (path, metadata) => {
     await mkdir(path.substring(0, path.lastIndexOf('/')), { recursive: true });
     const metadataJson = JSON.stringify(metadata, null, 2);
     await writeFile(path, metadataJson);
+};
+
+/**
+ * Read all metadata records from a per-day JSON file.
+ * Returns an empty array if the file does not exist.
+ * Migrates legacy single-object files to an array on read.
+ *
+ * @param {string} filePath Per-day metadata file path.
+ *
+ * @returns {Promise<Array<object>>} Array of metadata records (see PollMetadataRecord).
+ */
+const readMetadataRecords = async (filePath) => {
+    if (!(await pathExists(filePath))) {
+        return [];
+    }
+
+    const raw = await readFile(filePath, 'utf8');
+    let parsed;
+    try {
+        parsed = JSON.parse(raw);
+    } catch {
+        logger.warn(`⚠️ Metadata file is corrupted (${filePath}), treating as empty.`);
+        return [];
+    }
+
+    return Array.isArray(parsed) ? parsed : [parsed];
+};
+
+/**
+ * Append a metadata record to a per-day JSON file.
+ * Creates the file as a one-element array if it does not exist.
+ * Migrates legacy single-object files to a two-element array on first
+ * append. Treats a corrupted file as empty (warns to stderr).
+ *
+ * @param {string} filePath Per-day metadata file path.
+ * @param {object} record Metadata record (see PollMetadataRecord).
+ */
+const appendMetadataRecord = async (filePath, record) => {
+    await mkdir(dirname(filePath), { recursive: true });
+    const existing = await readMetadataRecords(filePath);
+    existing.push(record);
+    await writeFile(filePath, JSON.stringify(existing, null, 2));
+};
+
+/**
+ * Append synthetic events to their date-aligned JSONL files and run
+ * dedupe so the existing id-based dedupe collapses repeats.
+ *
+ * @param {string} collectionPath Path to the collection root.
+ * @param {Array<object>} events Synthetic events with `id` and `created_at`.
+ */
+const mergeSyntheticEventsIntoCollection = async (collectionPath, events) => {
+    if (!events || events.length === 0) {
+        return;
+    }
+    await mkdir(collectionPath, { recursive: true });
+    const sorted = sortEventsByDate(events);
+    await Promise.all(Object.keys(sorted).map((date) => writeEventsToFile(
+        `${collectionPath}/${date}${COLLECTION_FILE_EXTENSION}`,
+        sorted[date],
+        'a',
+    )));
+    await Promise.all(Object.keys(sorted).map((date) => removeDupesFromFile(
+        `${collectionPath}/${date}${COLLECTION_FILE_EXTENSION}`,
+    )));
 };
 
 export {
@@ -232,4 +317,7 @@ export {
     removeDupesFromCollection,
     removeOldFilesFromCollection,
     writeMetadataToFile,
+    appendMetadataRecord,
+    mergeSyntheticEventsIntoCollection,
+    readMetadataRecords,
 };

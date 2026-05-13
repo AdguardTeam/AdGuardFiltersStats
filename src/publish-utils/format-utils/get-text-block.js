@@ -1,9 +1,11 @@
 /**
- * Creates block with given params
- * @param {string} text
- * @param {string} textType
- * @param {string} blockType
- * @returns {Object}
+ * Creates block with given params.
+ *
+ * @param {string} text Block text content.
+ * @param {string} textType Slack text type.
+ * @param {string} blockType Slack block type.
+ *
+ * @returns {object} Slack Block Kit block object.
  */
 export const getTextBlock = (text, textType = 'mrkdwn', blockType = 'section') => {
     return {

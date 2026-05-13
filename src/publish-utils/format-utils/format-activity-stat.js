@@ -6,9 +6,11 @@ const TEAM_MEMBERS_STAT_HEADER = ':adguard: *AdGuard team*';
 const CONTRIBUTORS_STAT_HEADER = ':bust_in_silhouette: *Contributors*';
 
 /**
- * Converts activity stat object to an array of Slack blocks
- * @param {Object} activityStat
- * @returns {Object[]}
+ * Converts activity stat object to an array of Slack blocks.
+ *
+ * @param {object} activityStat Activity statistics keyed by username.
+ *
+ * @returns {object[]} Array of Slack Block Kit blocks.
  */
 export const formatActivityStat = (activityStat) => {
     // Render empty block if message url is not supplied

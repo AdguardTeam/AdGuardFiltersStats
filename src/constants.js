@@ -33,6 +33,15 @@ export const README_URL = 'https://github.com/AdguardTeam/AdGuardFiltersStats#gi
 
 export const MILLISECONDS_IN_DAY = 1000 * 60 * 60 * 24;
 export const EVENT_EXPIRATION_DAYS = 30;
+
+/**
+ * Minimum time (ms) between two successful polls before a gap is suspected.
+ *
+ * 90 minutes — exceeds the recommended 60-min poll cadence but stays below
+ * the point where the GitHub Events API (300-event cap) would start losing data.
+ */
+export const POLL_GAP_THRESHOLD_MS = 90 * 60 * 1000;
+
 export const ENDPOINTS = {
     ISSUES: 'GET /repos/{owner}/{repo}/issues',
     GITHUB_EVENTS: 'GET /repos/{owner}/{repo}/events',

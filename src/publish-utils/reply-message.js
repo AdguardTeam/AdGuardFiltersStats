@@ -1,9 +1,10 @@
 /**
- * Reply to a message with the channel ID and message TS
- * @param {Object} client Slack WebClient instance
- * @param {Object[]} message array of formatted blocks
- * @param {string} channelId
- * @param {string} threadTs id of a thread's parent message
+ * Reply to a message with the channel ID and message TS.
+ *
+ * @param {object} client Slack WebClient instance.
+ * @param {object[]} message Array of formatted blocks.
+ * @param {string} channelId Slack channel ID.
+ * @param {string} threadTs ID of a thread's parent message.
  */
 export async function replyMessage(client, message, channelId, threadTs) {
     try {

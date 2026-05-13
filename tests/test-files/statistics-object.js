@@ -1,8 +1,8 @@
 /**
- * Statistics object reference for testing and debugging purposes
+ * Statistics object reference for testing and debugging purposes.
  *
  * For example, it can be used as a mock for prepareStats as a way of not using Github API
- * and therefore not exhausting call limit
+ * and therefore not exhausting call limit.
  */
 export const statistics = {
     repoStat: {

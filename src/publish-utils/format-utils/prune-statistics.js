@@ -2,10 +2,12 @@ import { isTeamMember } from '../is-team-member';
 import { EXCLUDED_USERNAMES } from '../../constants';
 
 /**
- * Prune statistics object to exclude users by given params
- * @param {Object} statistics
- * @param {number} minActivity
- * @returns {Object}
+ * Prune statistics object to exclude users by given params.
+ *
+ * @param {object} statistics Aggregated statistics object.
+ * @param {number} minActivity Minimum activity threshold.
+ *
+ * @returns {object} Pruned statistics object.
  */
 export const pruneStatistics = (statistics, minActivity) => {
     const prunedStat = {
@@ -17,7 +19,6 @@ export const pruneStatistics = (statistics, minActivity) => {
         activitiesByUser,
     } = prunedStat;
 
-    // eslint-disable-next-line no-restricted-syntax
     for (const [username, count] of Object.entries(activityStat)) {
         const shouldBeRemoved = count <= minActivity || EXCLUDED_USERNAMES.includes(username);
         if (shouldBeRemoved && !isTeamMember(username)) {

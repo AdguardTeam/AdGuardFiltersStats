@@ -2,9 +2,14 @@ import { format } from 'date-fns';
 
 const repoStatToString = (repoStats) => {
     const { until, since } = repoStats.timePeriod;
+
+    const fromStr = format(new Date(since), 'yyy-MM-dd HH-mm-ss');
+    const untilStr = format(new Date(until), 'yyy-MM-dd HH-mm-ss');
+    const periodString = `from ${fromStr} to ${untilStr}`;
+
     const statString = `
     ## General repo statistics \n
-    Repo statistics for the period from ${format(new Date(since), 'yyy-MM-dd HH-mm-ss')} to ${format(new Date(until), 'yyy-MM-dd HH-mm-ss')}. \n
+    Repo statistics for the period ${periodString}. \n
     * New issues: ${repoStats.newIssues}
     * Resolved issues: ${repoStats.resolvedIssues}
     * Closed as stale: ${repoStats.closedAsStaleIssues}
@@ -58,7 +63,6 @@ const hourlyActivityToString = (hourlyContributorActivity, date) => {
 
 const activityByTimeToString = (activitiesByTime) => {
     let activityByTimeString = '\n*Daily activity*';
-    // eslint-disable-next-line no-restricted-syntax
     for (const [date, activities] of Object.entries(activitiesByTime)) {
         activityByTimeString += hourlyActivityToString(activities, date);
     }
@@ -69,7 +73,6 @@ const activityByTimeToString = (activitiesByTime) => {
 const detailedActivityToString = (activitiesByUser, activitiesByTime) => {
     let statString = '\n## Detailed contributor statistics';
 
-    // eslint-disable-next-line no-restricted-syntax
     for (const [name, activities] of Object.entries(activitiesByUser)) {
         let contributorString = `
         \n\n### ${name}\n
