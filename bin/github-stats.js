@@ -2,9 +2,9 @@
 'use strict';
 
 var dotenv = require('dotenv');
-var prepareStats = require('./prepare-stats-BH8PqQVf.js');
+var prepareStats = require('./prepare-stats-Cw77weSP.js');
 var dateFns = require('date-fns');
-require('./fs-utils-DF186O2_.js');
+require('./fs-utils-BE2k8eQv.js');
 require('@octokit/core');
 require('node:fs');
 require('node:fs/promises');
