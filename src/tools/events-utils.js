@@ -233,7 +233,10 @@ const getActivityAuthor = (event) => {
             break;
         }
         case EVENT_TYPES.ISSUES_EVENT: {
-            if (payload.action === ACTION_NAMES.CLOSED && !isStale(payload.issue)) {
+            // Any issue close counts as resolution activity, including closes
+            // of stale-labelled issues (stale bot closes are filtered out via
+            // EXCLUDED_USERNAMES below).
+            if (payload.action === ACTION_NAMES.CLOSED) {
                 contributorName = username;
             }
             break;

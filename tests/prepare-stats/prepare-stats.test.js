@@ -46,13 +46,39 @@ describe('prepareStats — reconciles missing closures from REST', () => {
             { since: '2026-04-21T00:00:00Z', until: '2026-04-21T23:59:59Z' },
         );
 
-        // The Stale-labelled close MUST NOT count toward resolvedIssues
-        expect(stats.activitiesByUser.user1.resolvedIssues).toBe(1);
+        // A human close of a stale-labelled issue counts as a regular resolution
+        expect(stats.activitiesByUser.user1.resolvedIssues).toBe(2);
         // mergedPulls must equal merged PR count, not new PR count
         expect(stats.activitiesByUser.user1.mergedPulls).toBe(1);
         expect(stats.activitiesByUser.user1.newPulls).toBe(1);
-        // Repo-level resolved excludes stale
-        expect(stats.repoStat.resolvedIssues).toBe(1);
+        // Repo-level resolved counts all closes that are not performed by the stale bot
+        expect(stats.repoStat.resolvedIssues).toBe(2);
+        // Human closes are never counted as "closed as stale"
+        expect(stats.repoStat.closedAsStaleIssues).toBe(0);
+    });
+
+    it('counts a stale bot close as closedAsStaleIssues', async () => {
+        const dir = await mkdtemp(path.join(tmpdir(), 'stats-bot-stale-'));
+        // eslint-disable-next-line global-require
+        const gh = require('../../src/tools/gh-utils');
+        gh.getClosedIssuesInWindow.mockResolvedValueOnce([
+            {
+                id: 9001,
+                number: 9001,
+                closed_at: '2026-04-21T12:00:00Z',
+                closed_by: { id: 41898282, login: 'github-actions[bot]' },
+                labels: [{ name: 'Stale' }],
+            },
+        ]);
+        gh.getPullsInWindow.mockResolvedValueOnce([]);
+
+        const stats = await prepareStats(
+            dir,
+            { owner: 'AdguardTeam', repo: 'AdguardFilters' },
+            { since: '2026-04-21T00:00:00Z', until: '2026-04-21T23:59:59Z' },
+        );
+
+        expect(stats.repoStat.resolvedIssues).toBe(0);
         expect(stats.repoStat.closedAsStaleIssues).toBe(1);
     });
 });
