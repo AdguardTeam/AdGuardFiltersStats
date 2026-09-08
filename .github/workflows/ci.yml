@@ -11,6 +11,8 @@ on:
     branches:
       - master
     paths-ignore:
+      # stats-data/ is updated periodically by the poll-events workflow,
+      # so pushes touching only this data should not trigger CI.
       - stats-data/**
 
 jobs:
