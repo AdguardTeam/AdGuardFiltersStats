@@ -1,0 +1,36 @@
+name: CI
+
+description: Lints, tests, and builds on pull requests and pushes to master.
+
+env:
+  NODE_VERSION: 22.17.0
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install package
+        run: yarn install
+
+      - name: Lint package
+        run: yarn lint
+
+      - name: Test package
+        run: yarn test
+
+      - name: Build package
+        run: yarn build
