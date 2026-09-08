@@ -7,7 +7,7 @@ import {
 } from '../constants';
 
 /**
- * Determines if Github event is 'opened'.
+ * Determines if GitHub event is 'opened'.
  *
  * @param {object} e GitHub event object.
  *
@@ -16,7 +16,7 @@ import {
 const isOpenedAction = (e) => e.payload.action === ACTION_NAMES.OPENED;
 
 /**
- * Determines if Github event is 'closed'.
+ * Determines if GitHub event is 'closed'.
  *
  * @param {object} e GitHub event object.
  *
@@ -25,7 +25,7 @@ const isOpenedAction = (e) => e.payload.action === ACTION_NAMES.OPENED;
 const isClosedAction = (e) => e.payload.action === ACTION_NAMES.CLOSED;
 
 /**
- * Determines if Github issue has Stale label.
+ * Determines if GitHub issue has Stale label.
  *
  * @param {object} issue GitHub issue object.
  *
@@ -164,7 +164,7 @@ const sortEventsByDate = (events) => {
 };
 
 /**
- * Modify events array so index reflects events create hour.
+ * Modify events array so index reflects events creation hour.
  *
  * @param {Array<object>} events Array of GitHub events.
  *
