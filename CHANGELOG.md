@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 [Keep a Changelog]: https://keepachangelog.com/en/1.0.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 
+## v1.1.2
+
+### Fixed
+
+- Upgraded `@slack/web-api` from 7.15.1 to 8.1.1, removing the transitive `axios`
+  dependency and addressing CVE-2026-44486 (proxy credential disclosure via
+  HTTP redirects).
+
 ## v1.1.0
 
 ### Fixed
