@@ -1,5 +1,5 @@
 import { countEventsByType, getActivityAuthor } from '../../src/tools/events-utils';
-import { EVENT_TYPES } from '../../src/constants';
+import { EVENT_TYPES, LABEL_NAMES } from '../../src/constants';
 
 const makePrEvent = ({ action, mergedAt }) => ({
     type: EVENT_TYPES.PULL_REQUEST_EVENT,
@@ -85,5 +85,17 @@ describe('getActivityAuthor — EXCLUDED_USERNAMES', () => {
             },
         };
         expect(getActivityAuthor(event)).toBeNull();
+    });
+
+    it('returns the actor for a human close of a stale-labelled issue', () => {
+        const event = {
+            type: EVENT_TYPES.ISSUES_EVENT,
+            actor: { login: 'alice' },
+            payload: {
+                action: 'closed',
+                issue: { labels: [{ name: LABEL_NAMES.STALE }] },
+            },
+        };
+        expect(getActivityAuthor(event)).toBe('alice');
     });
 });

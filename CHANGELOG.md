@@ -11,10 +11,10 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 
 ### Fixed
 
-- "Closed as stale" metric now counts only issues actually closed by the stale
-  bot (`adguard-bot`, `github-actions[bot]`). Closes of stale-labelled issues
-  performed manually by maintainers are counted as regular resolutions instead
-  of bot closures.
+- "Closed as stale" metric now counts only stale-labelled issues that were
+  closed by the stale bot (`adguard-bot`, `github-actions[bot]`). All other
+  closes — including stale-labelled issues closed manually by maintainers —
+  are counted as regular resolutions.
 
 ## v1.1.0
 

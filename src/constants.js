@@ -30,19 +30,6 @@ export const EXCLUDED_USERNAMES = [
     'github-actions[bot]',
 ];
 
-/**
- * Usernames of bots that close issues marked as stale.
- *
- * Only issue closes performed by these actors count toward the
- * "Closed as stale" metric. Closes by any other actor (e.g. a
- * maintainer closing a stale-labelled issue during triage) count as
- * regular resolutions.
- */
-export const STALE_BOT_USERNAMES = [
-    'adguard-bot',
-    'github-actions[bot]',
-];
-
 export const README_URL = 'https://github.com/AdguardTeam/AdGuardFiltersStats#github-stats-cli-app';
 
 export const MILLISECONDS_IN_DAY = 1000 * 60 * 60 * 24;
