@@ -4,11 +4,8 @@
     "author": "Adguard Software Ltd.",
     "license": "MIT",
     "scripts": {
-        "prepoll": "yarn build",
         "poll": "node ./dist/github-poll.js",
-        "prestats": "yarn build",
         "stats": "node ./dist/github-stats.js",
-        "prepublish": "yarn build",
         "publish": "node ./dist/github-publish.js",
         "build": "rollup -c",
         "test": "jest",
