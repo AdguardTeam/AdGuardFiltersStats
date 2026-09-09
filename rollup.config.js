@@ -6,11 +6,11 @@ import commonjs from '@rollup/plugin-commonjs';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
 
-const BIN_DIR = 'bin';
+const DIST_DIR = 'dist';
 
 const dirname = path.dirname(new URL(import.meta.url).pathname);
 
-const outputDir = path.join(dirname, BIN_DIR);
+const outputDir = path.join(dirname, DIST_DIR);
 
 const config = [
     {

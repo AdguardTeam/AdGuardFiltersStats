@@ -3,15 +3,10 @@
     "version": "1.1.1",
     "author": "Adguard Software Ltd.",
     "license": "MIT",
-    "bin": {
-        "github-poll": "./bin/github-poll.js",
-        "github-publish": "./bin/github-publish.js",
-        "github-stats": "./bin/github-stats.js"
-    },
     "scripts": {
-        "poll": "node ./bin/github-poll.js",
-        "stats": "node ./bin/github-stats.js",
-        "publish": "node ./bin/github-publish.js",
+        "poll": "node ./dist/github-poll.js",
+        "stats": "node ./dist/github-stats.js",
+        "publish": "node ./dist/github-publish.js",
         "build": "rollup -c",
         "test": "jest",
         "lint": "eslint --cache .",
