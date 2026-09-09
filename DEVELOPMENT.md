@@ -120,7 +120,8 @@ Rollup writes:
   `bin/prepare-stats-*.js`)
 
 Do not hand-edit any file under `bin/` — re-run `yarn build` instead.
-Commit the regenerated `bin/` artifacts together with the source change.
+`bin/` is gitignored: the regenerated bundles are only ever produced
+locally or inside CI workflows, never committed.
 
 ### 5. Run a CLI locally
 
@@ -145,8 +146,9 @@ described above.
 - Before opening a PR:
     - Run `yarn lint` to check for code style issues.
     - Run `yarn test` to ensure all tests pass.
-    - Run `yarn build` and commit the regenerated `bin/` artifacts if
-      any source under `src/` changed.
+    - Run `yarn build` to verify the bundle still produces valid
+      CommonJS output (do not commit the regenerated `bin/` artifacts —
+      they are gitignored).
     - Update [README.md](./README.md), [.env-example](./.env-example),
       [examples/](./examples/), [AGENTS.md](./AGENTS.md), and
       [CHANGELOG.md](./CHANGELOG.md) when relevant (see the
