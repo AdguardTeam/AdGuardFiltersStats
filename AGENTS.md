@@ -131,7 +131,7 @@ not to.
 | `yarn lint-staged` | Run lint-staged (used by Husky)     |
 | `yarn poll`        | Poll events (locally)               |
 | `yarn stats`       | Print stats (locally)               |
-| `yarn publish`     | Publish to Slack (locally)          |
+| `yarn run publish` | Publish to Slack (locally)          |
 
 There is no separate formatter or type checker — ESLint (`airbnb-base`) is
 the only static-analysis gate, and `yarn build` (Rollup + Babel) is the

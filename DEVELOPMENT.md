@@ -105,7 +105,7 @@ and the relevant section in [README.md](./README.md).
 
 The `dist/` directory contains Rollup-generated CommonJS bundles with
 shebangs. Source changes in `src/` are not picked up by `yarn poll`,
-`yarn stats`, or `yarn publish` until you rebuild:
+`yarn stats`, or `yarn run publish` until you rebuild:
 
 ```bash
 yarn build
@@ -128,9 +128,9 @@ locally or inside CI workflows, never committed.
 After `yarn build`, invoke any of:
 
 ```bash
-yarn poll       # node ./dist/github-poll.js
-yarn stats      # node ./dist/github-stats.js
-yarn publish    # node ./dist/github-publish.js
+yarn poll           # node ./dist/github-poll.js
+yarn stats          # node ./dist/github-stats.js
+yarn run publish    # node ./dist/github-publish.js
 ```
 
 Each script reads its configuration from the environment (or `.env`) as
@@ -277,7 +277,7 @@ env \
     REPO=AdguardTeam/AdguardFilters \
     SINCE=2025-05-01T00:00:00Z \
     UNTIL=2025-05-02T00:00:00Z \
-    yarn publish
+    yarn run publish
 ```
 
 ### Adding a new dependency
@@ -378,7 +378,7 @@ repository, and daily JSONL files older than `EVENT_EXPIRATION_DAYS`
 (30) are pruned during stat preparation. Run `github-poll` more
 frequently from CI to avoid gaps.
 
-**`yarn poll` / `yarn stats` / `yarn publish` does not reflect my
+**`yarn poll` / `yarn stats` / `yarn run publish` does not reflect my
 changes**
 These scripts run the bundled files under `dist/`. Re-run `yarn build`
 after any change to `src/`.

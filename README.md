@@ -77,7 +77,7 @@ yarn build
 ```
 
 The commands are then available through the `yarn` scripts `yarn poll`,
-`yarn stats`, and `yarn publish`.
+`yarn stats`, and `yarn run publish`.
 
 ## Quick start
 
@@ -156,7 +156,7 @@ issues, new and merged pull requests, etc.).
 ### Publish stats to Slack
 
 ```bash
-yarn publish
+yarn run publish
 ```
 
 Required variables: `COLLECTION_PATH`, `REPO`, `SLACK_OAUTH_TOKEN`,

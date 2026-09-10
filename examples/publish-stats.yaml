@@ -40,4 +40,4 @@ jobs:
           REPO: ${{ github.event.inputs.repo }}
           SINCE: ${{ github.event.inputs.since }}
           UNTIL: ${{ github.event.inputs.until }}
-        run: yarn publish
+        run: yarn run publish
