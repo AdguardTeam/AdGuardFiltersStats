@@ -124,7 +124,7 @@ not to.
 | Command            | Purpose                             |
 | ------------------ | ----------------------------------- |
 | `yarn install`     | Install dependencies                |
-| `yarn build`       | Build CLI bundles (`src/` → `dist/`) |
+| `yarn build`       | Build CLI bundles (`src/` → `dist/`)|
 | `yarn test`        | Run unit tests                      |
 | `yarn lint`        | Lint the entire repo                |
 | `yarn lint --fix`  | Auto-fix lint issues                |
