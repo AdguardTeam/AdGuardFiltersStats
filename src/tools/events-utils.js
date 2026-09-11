@@ -40,6 +40,35 @@ const isStale = (issue) => {
 };
 
 /**
+ * Determines if the event actor is a stale bot.
+ *
+ * The stale bots are the same accounts that are excluded from the
+ * statistics via EXCLUDED_USERNAMES — keeping a single list makes the
+ * repo-level "Closed as stale" metric and the contributor-level
+ * resolution counter stay consistent.
+ *
+ * @param {object} e GitHub event object.
+ *
+ * @returns {boolean} True if the event actor is a stale bot username.
+ */
+const isStaleBotActor = (e) => EXCLUDED_USERNAMES.includes(e.actor?.login);
+
+/**
+ * Determines if an issue close event counts as "closed as stale".
+ *
+ * A close counts as stale only when the stale bot closed a stale-labelled
+ * issue. Every other close — including stale-labelled issues closed
+ * manually by maintainers and bot closes of non-stale issues — is a
+ * regular resolution, so this predicate and its negation partition all
+ * close events.
+ *
+ * @param {object} e GitHub event object.
+ *
+ * @returns {boolean} True if the event is a stale bot close of a stale issue.
+ */
+const isClosedAsStale = (e) => isStale(e.payload.issue) && isStaleBotActor(e);
+
+/**
  * Determines if pull request is merged.
  *
  * @param {object} pull GitHub pull request event object.
@@ -233,7 +262,10 @@ const getActivityAuthor = (event) => {
             break;
         }
         case EVENT_TYPES.ISSUES_EVENT: {
-            if (payload.action === ACTION_NAMES.CLOSED && !isStale(payload.issue)) {
+            // any close counts as resolution activity, including closes
+            // of stale-labelled issues (stale bot closes are filtered out
+            // via EXCLUDED_USERNAMES below)
+            if (payload.action === ACTION_NAMES.CLOSED) {
                 contributorName = username;
             }
             break;
@@ -263,6 +295,8 @@ export {
     isOpenedAction,
     isClosedAction,
     isStale,
+    isStaleBotActor,
+    isClosedAsStale,
     isMerged,
     isCreatedSince,
     isCreatedUntil,

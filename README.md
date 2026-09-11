@@ -32,7 +32,7 @@ GitHub Actions) so that no events are lost, then run `github-stats` or
 An activity point is counted for each of the following user actions:
 
 - Commit pushed.
-- Issue closed (unless marked as *Stale*).
+- Issue closed (unless closed by a bot).
 - Comment added to an Issue or Pull Request.
 - Pull Request review (approved or rejected).
 - Pull Request merged.
@@ -66,17 +66,18 @@ record per poll) so polling gaps can be analyzed after the fact.
 
 ## <a id="how-to-install"></a> Installation
 
-Install globally via npm:
+The package is no longer distributed via npm — install and build from
+source:
 
 ```bash
-npm i -g @adguard/github-stats
+git clone https://github.com/AdguardTeam/AdGuardFiltersStats.git
+cd AdGuardFiltersStats
+yarn install
+yarn build
 ```
 
-Or run with npx without installing:
-
-```bash
-npx @adguard/github-stats <command>
-```
+The commands are then available through the `yarn` scripts `yarn poll`,
+`yarn stats`, and `yarn run publish`.
 
 ## Quick start
 
@@ -91,7 +92,7 @@ npx @adguard/github-stats <command>
 2. Poll today's events:
 
     ```bash
-    github-poll
+    yarn poll
     ```
 
 3. Print stats for the last week:
@@ -99,7 +100,7 @@ npx @adguard/github-stats <command>
     ```bash
     export SINCE=2025-05-01T00:00:00Z
     export UNTIL=2025-05-08T00:00:00Z
-    github-stats
+    yarn stats
     ```
 
 ## Usage
@@ -107,7 +108,7 @@ npx @adguard/github-stats <command>
 ### Poll events
 
 ```bash
-github-poll
+yarn poll
 ```
 
 Required variables: `COLLECTION_PATH`, `REPO`.
@@ -142,7 +143,7 @@ on the next poll.)
 ### Print stats in console
 
 ```bash
-github-stats
+yarn stats
 ```
 
 Required variables: `COLLECTION_PATH`, `REPO`.
@@ -155,7 +156,7 @@ issues, new and merged pull requests, etc.).
 ### Publish stats to Slack
 
 ```bash
-github-publish
+yarn run publish
 ```
 
 Required variables: `COLLECTION_PATH`, `REPO`, `SLACK_OAUTH_TOKEN`,

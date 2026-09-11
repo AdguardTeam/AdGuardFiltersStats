@@ -30,7 +30,7 @@ export const EXCLUDED_USERNAMES = [
     'github-actions[bot]',
 ];
 
-export const README_URL = 'https://github.com/AdguardTeam/AdGuardFiltersStats#github-stats-cli-app';
+export const README_URL = 'https://github.com/AdguardTeam/AdGuardFiltersStats#activity_count';
 
 export const MILLISECONDS_IN_DAY = 1000 * 60 * 60 * 24;
 export const EVENT_EXPIRATION_DAYS = 30;

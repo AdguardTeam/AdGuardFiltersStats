@@ -1,9 +1,9 @@
 import { getOpenIssues } from '../tools/gh-utils';
 import {
-    isStale,
     isMerged,
     isClosedAction,
     isOpenedAction,
+    isClosedAsStale,
 } from '../tools/events-utils';
 import { EVENT_TYPES } from '../constants';
 
@@ -19,10 +19,14 @@ import { EVENT_TYPES } from '../constants';
 export const prepareRepoStat = async (events, commonRequestData, timePeriod) => {
     const issuesEvents = events.filter((e) => e.type === EVENT_TYPES.ISSUES_EVENT);
     const newIssueEvents = issuesEvents.filter((e) => isOpenedAction(e));
-    const resolvedIssueEvents = issuesEvents
-        .filter((e) => isClosedAction(e) && !isStale(e.payload.issue));
-    const closedAsStaleIssueEvents = issuesEvents
-        .filter((e) => isClosedAction(e) && isStale(e.payload.issue));
+    const closedIssueEvents = issuesEvents.filter((e) => isClosedAction(e));
+    // An issue is "closed as stale" only when the stale bot closed a
+    // stale-labelled issue. Every other close — including stale-labelled
+    // issues closed manually by maintainers and bot closes of non-stale
+    // issues — counts as a regular resolution, so the two counters
+    // partition all closes.
+    const closedAsStaleIssueEvents = closedIssueEvents.filter(isClosedAsStale);
+    const resolvedIssueEvents = closedIssueEvents.filter((e) => !isClosedAsStale(e));
 
     const pullsEvents = events.filter((e) => e.type === EVENT_TYPES.PULL_REQUEST_EVENT);
     const newPullEvents = pullsEvents.filter((e) => isOpenedAction(e));

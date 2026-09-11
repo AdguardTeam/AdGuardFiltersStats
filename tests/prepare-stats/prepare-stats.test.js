@@ -1,4 +1,5 @@
 import { mkdtemp, copyFile } from 'fs/promises';
+import { readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 
@@ -24,6 +25,14 @@ jest.mock('../../src/tools/gh-utils', () => {
 
 // eslint-disable-next-line import/first
 import { prepareStats } from '../../src/prepare-stats';
+// eslint-disable-next-line import/first
+import { EXCLUDED_USERNAMES } from '../../src/constants';
+
+const reconcileFixtureDir = path.join(__dirname, '..', 'test-files', 'reconcile');
+
+const botClosedIssues = JSON.parse(
+    readFileSync(path.join(reconcileFixtureDir, 'bot-closed-issues.json'), 'utf8'),
+);
 
 describe('prepareStats — reconciles missing closures from REST', () => {
     beforeEach(() => {
@@ -46,14 +55,60 @@ describe('prepareStats — reconciles missing closures from REST', () => {
             { since: '2026-04-21T00:00:00Z', until: '2026-04-21T23:59:59Z' },
         );
 
-        // The Stale-labelled close MUST NOT count toward resolvedIssues
-        expect(stats.activitiesByUser.user1.resolvedIssues).toBe(1);
+        // A human close of a stale-labelled issue counts as a regular resolution
+        expect(stats.activitiesByUser.user1.resolvedIssues).toBe(2);
         // mergedPulls must equal merged PR count, not new PR count
         expect(stats.activitiesByUser.user1.mergedPulls).toBe(1);
         expect(stats.activitiesByUser.user1.newPulls).toBe(1);
-        // Repo-level resolved excludes stale
+        // Repo-level resolved counts all closes that are not performed by the stale bot
+        expect(stats.repoStat.resolvedIssues).toBe(2);
+        // Human closes are never counted as "closed as stale"
+        expect(stats.repoStat.closedAsStaleIssues).toBe(0);
+    });
+
+    it.each(EXCLUDED_USERNAMES)(
+        'counts a %s close of a stale issue as closedAsStaleIssues, not as a contributor resolution',
+        async (botLogin) => {
+            const dir = await mkdtemp(path.join(tmpdir(), 'stats-bot-stale-'));
+            // eslint-disable-next-line global-require
+            const gh = require('../../src/tools/gh-utils');
+            gh.getClosedIssuesInWindow.mockResolvedValueOnce([
+                { ...botClosedIssues[0], closed_by: { id: 41898282, login: botLogin } },
+            ]);
+            gh.getPullsInWindow.mockResolvedValueOnce([]);
+
+            const stats = await prepareStats(
+                dir,
+                { owner: 'AdguardTeam', repo: 'AdguardFilters' },
+                { since: '2026-04-21T00:00:00Z', until: '2026-04-21T23:59:59Z' },
+            );
+
+            expect(stats.repoStat.resolvedIssues).toBe(0);
+            expect(stats.repoStat.closedAsStaleIssues).toBe(1);
+            // The bot close must not be credited to any contributor
+            expect(stats.activitiesByUser).toEqual({});
+        },
+    );
+
+    it('counts a stale bot close of a non-stale issue as a regular resolution', async () => {
+        const dir = await mkdtemp(path.join(tmpdir(), 'stats-bot-resolved-'));
+        // eslint-disable-next-line global-require
+        const gh = require('../../src/tools/gh-utils');
+        gh.getClosedIssuesInWindow.mockResolvedValueOnce([
+            { ...botClosedIssues[0], labels: [] },
+        ]);
+        gh.getPullsInWindow.mockResolvedValueOnce([]);
+
+        const stats = await prepareStats(
+            dir,
+            { owner: 'AdguardTeam', repo: 'AdguardFilters' },
+            { since: '2026-04-21T00:00:00Z', until: '2026-04-21T23:59:59Z' },
+        );
+
         expect(stats.repoStat.resolvedIssues).toBe(1);
-        expect(stats.repoStat.closedAsStaleIssues).toBe(1);
+        expect(stats.repoStat.closedAsStaleIssues).toBe(0);
+        // The bot close must not be credited to any contributor
+        expect(stats.activitiesByUser).toEqual({});
     });
 });
 

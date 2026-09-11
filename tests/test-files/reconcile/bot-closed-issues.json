@@ -1,0 +1,9 @@
+[
+  {
+    "id": 9001,
+    "number": 9001,
+    "closed_at": "2026-04-21T12:00:00Z",
+    "closed_by": { "id": 41898282, "login": "github-actions[bot]" },
+    "labels": [{ "name": "Stale" }]
+  }
+]

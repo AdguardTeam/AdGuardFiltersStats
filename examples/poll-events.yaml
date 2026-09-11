@@ -14,15 +14,17 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 16
-      - name: Install package
-        run: npm i -g @adguard/github-stats
+          node-version: 22
+      - name: Install dependencies and build
+        run: |
+          yarn install
+          yarn build
       - name: Poll Github events
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COLLECTION_PATH: ./stats-data
           REPO: AdguardTeam/AdguardFilters
-        run: github-poll
+        run: yarn poll
       - name: commit artifacts
         uses: EndBug/add-and-commit@v9
         with:
