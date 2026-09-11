@@ -1,10 +1,9 @@
 import { getOpenIssues } from '../tools/gh-utils';
 import {
-    isStale,
     isMerged,
     isClosedAction,
     isOpenedAction,
-    isStaleBotActor,
+    isClosedAsStale,
 } from '../tools/events-utils';
 import { EVENT_TYPES } from '../constants';
 
@@ -26,10 +25,8 @@ export const prepareRepoStat = async (events, commonRequestData, timePeriod) => 
     // issues closed manually by maintainers and bot closes of non-stale
     // issues — counts as a regular resolution, so the two counters
     // partition all closes.
-    const closedAsStaleIssueEvents = closedIssueEvents
-        .filter((e) => isStale(e.payload.issue) && isStaleBotActor(e));
-    const resolvedIssueEvents = closedIssueEvents
-        .filter((e) => !(isStale(e.payload.issue) && isStaleBotActor(e)));
+    const closedAsStaleIssueEvents = closedIssueEvents.filter(isClosedAsStale);
+    const resolvedIssueEvents = closedIssueEvents.filter((e) => !isClosedAsStale(e));
 
     const pullsEvents = events.filter((e) => e.type === EVENT_TYPES.PULL_REQUEST_EVENT);
     const newPullEvents = pullsEvents.filter((e) => isOpenedAction(e));

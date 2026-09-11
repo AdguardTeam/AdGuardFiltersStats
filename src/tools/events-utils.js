@@ -54,6 +54,21 @@ const isStale = (issue) => {
 const isStaleBotActor = (e) => EXCLUDED_USERNAMES.includes(e.actor?.login);
 
 /**
+ * Determines if an issue close event counts as "closed as stale".
+ *
+ * A close counts as stale only when the stale bot closed a stale-labelled
+ * issue. Every other close — including stale-labelled issues closed
+ * manually by maintainers and bot closes of non-stale issues — is a
+ * regular resolution, so this predicate and its negation partition all
+ * close events.
+ *
+ * @param {object} e GitHub event object.
+ *
+ * @returns {boolean} True if the event is a stale bot close of a stale issue.
+ */
+const isClosedAsStale = (e) => isStale(e.payload.issue) && isStaleBotActor(e);
+
+/**
  * Determines if pull request is merged.
  *
  * @param {object} pull GitHub pull request event object.
@@ -281,6 +296,7 @@ export {
     isClosedAction,
     isStale,
     isStaleBotActor,
+    isClosedAsStale,
     isMerged,
     isCreatedSince,
     isCreatedUntil,

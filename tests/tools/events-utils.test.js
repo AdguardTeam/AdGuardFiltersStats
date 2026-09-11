@@ -1,5 +1,28 @@
-import { countEventsByType, getActivityAuthor } from '../../src/tools/events-utils';
-import { EVENT_TYPES, LABEL_NAMES } from '../../src/constants';
+import {
+    countEventsByType,
+    getActivityAuthor,
+    isClosedAsStale,
+} from '../../src/tools/events-utils';
+import { EVENT_TYPES, LABEL_NAMES, EXCLUDED_USERNAMES } from '../../src/constants';
+
+const makeCloseEvent = ({ actor, labels }) => ({
+    type: EVENT_TYPES.ISSUES_EVENT,
+    actor: { login: actor },
+    payload: {
+        action: 'closed',
+        issue: { labels: labels.map((name) => ({ name })) },
+    },
+});
+
+const staleCloseEvent = (actor) => makeCloseEvent({
+    actor,
+    labels: [LABEL_NAMES.STALE],
+});
+
+const nonStaleCloseEvent = (actor) => makeCloseEvent({
+    actor,
+    labels: [],
+});
 
 const makePrEvent = ({ action, mergedAt }) => ({
     type: EVENT_TYPES.PULL_REQUEST_EVENT,
@@ -35,6 +58,27 @@ describe('countEventsByType — pull request counters', () => {
 
     it('returns 0 for merged PRs when contributor has no PR events', () => {
         expect(countEventsByType({ events: {} }, EVENT_TYPES.MERGED_PULL_EVENT)).toBe(0);
+    });
+});
+
+describe('isClosedAsStale — close event partition', () => {
+    it.each(EXCLUDED_USERNAMES)(
+        'returns true for a %s close of a stale-labelled issue',
+        (botLogin) => {
+            expect(isClosedAsStale(staleCloseEvent(botLogin))).toBe(true);
+        },
+    );
+
+    it('returns false for a human close of a stale-labelled issue', () => {
+        expect(isClosedAsStale(staleCloseEvent('alice'))).toBe(false);
+    });
+
+    it('returns false for a bot close of a non-stale issue', () => {
+        expect(isClosedAsStale(nonStaleCloseEvent(EXCLUDED_USERNAMES[0]))).toBe(false);
+    });
+
+    it('returns false for a human close of a non-stale issue', () => {
+        expect(isClosedAsStale(nonStaleCloseEvent('alice'))).toBe(false);
     });
 });
 
