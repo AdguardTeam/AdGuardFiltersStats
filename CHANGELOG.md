@@ -15,6 +15,15 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
   dependency and addressing CVE-2026-44486 (proxy credential disclosure via
   HTTP redirects).
 
+## v1.1.1
+
+### Fixed
+
+- "Closed as stale" metric now counts only stale-labelled issues that were
+  closed by the stale bot (`adguard-bot`, `github-actions[bot]`). All other
+  closes — including stale-labelled issues closed manually by maintainers —
+  are counted as regular resolutions.
+
 ## v1.1.0
 
 ### Fixed
