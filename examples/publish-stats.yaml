@@ -26,9 +26,11 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 16
-      - name: Install package
-        run: yarn
+          node-version: 22
+      - name: Install dependencies and build
+        run: |
+          yarn install
+          yarn build
       - name: Publish repo stats
         env:
           SLACK_OAUTH_TOKEN: ${{ secrets.SLACK_OAUTH_TOKEN }}
@@ -38,4 +40,4 @@ jobs:
           REPO: ${{ github.event.inputs.repo }}
           SINCE: ${{ github.event.inputs.since }}
           UNTIL: ${{ github.event.inputs.until }}
-        run: github-publish
+        run: yarn run publish

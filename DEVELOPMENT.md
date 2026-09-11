@@ -41,7 +41,7 @@ rules, and AI agent guidance, see [AGENTS.md](./AGENTS.md).
 Install the following tools before you start:
 
 - **Node.js 22.17.0 or newer** — required by the runtime; the codebase uses
-  ES Modules in `src/` and Rollup-bundled CommonJS in `bin/`.
+  ES Modules in `src/` and Rollup-bundled CommonJS in `dist/`.
 - **Yarn 1.22.x (Classic)** — the committed lockfile is `yarn.lock` and
   every workflow under [.github/workflows/](./.github/workflows/) calls
   `yarn install` and `yarn build`. Yarn 2+ (Berry) is not supported.
@@ -103,9 +103,9 @@ and the relevant section in [README.md](./README.md).
 
 ### 4. Build the CLI bundles
 
-The `bin/` directory contains Rollup-generated CommonJS bundles with
+The `dist/` directory contains Rollup-generated CommonJS bundles with
 shebangs. Source changes in `src/` are not picked up by `yarn poll`,
-`yarn stats`, or `yarn publish` until you rebuild:
+`yarn stats`, or `yarn run publish` until you rebuild:
 
 ```bash
 yarn build
@@ -113,23 +113,24 @@ yarn build
 
 Rollup writes:
 
-- `bin/github-poll.js`
-- `bin/github-stats.js`
-- `bin/github-publish.js`
-- hashed shared chunks (e.g. `bin/fs-utils-*.js`,
-  `bin/prepare-stats-*.js`)
+- `dist/github-poll.js`
+- `dist/github-stats.js`
+- `dist/github-publish.js`
+- hashed shared chunks (e.g. `dist/fs-utils-*.js`,
+  `dist/prepare-stats-*.js`)
 
-Do not hand-edit any file under `bin/` — re-run `yarn build` instead.
-Commit the regenerated `bin/` artifacts together with the source change.
+Do not hand-edit any file under `dist/` — re-run `yarn build` instead.
+`dist/` is gitignored: the regenerated bundles are only ever produced
+locally or inside CI workflows, never committed.
 
 ### 5. Run a CLI locally
 
 After `yarn build`, invoke any of:
 
 ```bash
-yarn poll       # node ./bin/github-poll.js
-yarn stats      # node ./bin/github-stats.js
-yarn publish    # node ./bin/github-publish.js
+yarn poll           # node ./dist/github-poll.js
+yarn stats          # node ./dist/github-stats.js
+yarn run publish    # node ./dist/github-publish.js
 ```
 
 Each script reads its configuration from the environment (or `.env`) as
@@ -145,8 +146,9 @@ described above.
 - Before opening a PR:
     - Run `yarn lint` to check for code style issues.
     - Run `yarn test` to ensure all tests pass.
-    - Run `yarn build` and commit the regenerated `bin/` artifacts if
-      any source under `src/` changed.
+    - Run `yarn build` to verify the bundle still produces valid
+      CommonJS output (do not commit the regenerated `dist/` artifacts —
+      they are gitignored).
     - Update [README.md](./README.md), [.env-example](./.env-example),
       [examples/](./examples/), [AGENTS.md](./AGENTS.md), and
       [CHANGELOG.md](./CHANGELOG.md) when relevant (see the
@@ -156,7 +158,7 @@ described above.
 ### Code style
 
 - Source under [src/](./src/) and [tests/](./tests/) is authored as ES
-  Modules. Babel + Rollup transpile to CommonJS for `bin/`.
+  Modules. Babel + Rollup transpile to CommonJS for `dist/`.
 - Linting is the only static-analysis gate: ESLint with
   `eslint-config-airbnb-base`, configured in [.eslintrc](./.eslintrc).
 - There is no Prettier and no TypeScript. Match the surrounding style
@@ -275,7 +277,7 @@ env \
     REPO=AdguardTeam/AdguardFilters \
     SINCE=2025-05-01T00:00:00Z \
     UNTIL=2025-05-02T00:00:00Z \
-    yarn publish
+    yarn run publish
 ```
 
 ### Adding a new dependency
@@ -329,7 +331,7 @@ configuration in `.vscode/launch.json`:
             "type": "node",
             "request": "launch",
             "name": "Debug github-poll",
-            "program": "${workspaceFolder}/bin/github-poll.js",
+            "program": "${workspaceFolder}/dist/github-poll.js",
             "envFile": "${workspaceFolder}/.env",
             "console": "integratedTerminal",
             "skipFiles": ["<node_internals>/**"]
@@ -338,7 +340,7 @@ configuration in `.vscode/launch.json`:
 }
 ```
 
-Run `yarn build` once before starting the debugger so `bin/` reflects
+Run `yarn build` once before starting the debugger so `dist/` reflects
 your latest changes.
 
 ### Debugging a Jest test in VS Code
@@ -376,9 +378,9 @@ repository, and daily JSONL files older than `EVENT_EXPIRATION_DAYS`
 (30) are pruned during stat preparation. Run `github-poll` more
 frequently from CI to avoid gaps.
 
-**`yarn poll` / `yarn stats` / `yarn publish` does not reflect my
+**`yarn poll` / `yarn stats` / `yarn run publish` does not reflect my
 changes**
-These scripts run the bundled files under `bin/`. Re-run `yarn build`
+These scripts run the bundled files under `dist/`. Re-run `yarn build`
 after any change to `src/`.
 
 **Pre-commit hook does not run**
@@ -387,9 +389,9 @@ hook. Verify `.husky/pre-commit` is executable
 (`chmod +x .husky/pre-commit`).
 
 **`yarn build` fails with a Rollup chunk error**
-Stale or hand-edited files under `bin/` (especially the hashed
+Stale or hand-edited files under `dist/` (especially the hashed
 `fs-utils-*.js` / `prepare-stats-*.js` chunks) can confuse incremental
-builds. Delete `bin/` and re-run `yarn build`.
+builds. Delete `dist/` and re-run `yarn build`.
 
 **Slack publish fails with `not_in_channel`**
 Invite the bot user (whose token is in `SLACK_OAUTH_TOKEN`) to the

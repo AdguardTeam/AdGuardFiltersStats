@@ -1,4 +1,4 @@
 node_modules/
-bin/
+dist/
 stats-data/
 examples/
