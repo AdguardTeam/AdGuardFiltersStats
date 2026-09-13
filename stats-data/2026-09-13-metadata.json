@@ -118,5 +118,20 @@
     "error": null,
     "collectionPath": "./stats-data",
     "repo": "AdguardTeam/AdguardFilters"
+  },
+  {
+    "timestamp": "2026-09-13T04:39:10.793Z",
+    "totalEvents": 299,
+    "pagesCollected": 10,
+    "eventsInFile": 70,
+    "rateLimitRemaining": 4988,
+    "rateLimitReached": false,
+    "rateLimitReset": "2026-09-13T05:38:36.000Z",
+    "oldestEventAt": "2026-09-10T10:25:20.000Z",
+    "newestEventAt": "2026-09-13T04:38:03.000Z",
+    "gapSuspected": false,
+    "error": null,
+    "collectionPath": "./stats-data",
+    "repo": "AdguardTeam/AdguardFilters"
   }
 ]
