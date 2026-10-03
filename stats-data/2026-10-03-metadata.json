@@ -1,0 +1,17 @@
+[
+  {
+    "timestamp": "2026-10-03T00:35:12.388Z",
+    "totalEvents": 300,
+    "pagesCollected": 10,
+    "eventsInFile": 15,
+    "rateLimitRemaining": 4988,
+    "rateLimitReached": false,
+    "rateLimitReset": "2026-10-03T01:34:36.000Z",
+    "oldestEventAt": "2026-10-01T04:23:18.000Z",
+    "newestEventAt": "2026-10-03T00:31:06.000Z",
+    "gapSuspected": false,
+    "error": null,
+    "collectionPath": "./stats-data",
+    "repo": "AdguardTeam/AdguardFilters"
+  }
+]
