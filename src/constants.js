@@ -67,6 +67,7 @@ export const LABEL_NAMES = {
 export const ACTION_NAMES = {
     OPENED: 'opened',
     CLOSED: 'closed',
+    MERGED: 'merged',
 };
 
 export const COLLECTION_FILE_EXTENSION = '.jsonl';

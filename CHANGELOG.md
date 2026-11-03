@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
   no longer includes the commits list in `PushEvent` payloads, so the
   previous logic counted a whole push as one commit for the pusher and
   dropped commits that another user pushed.
+- Pull request activity is now counted from reduced Events API payloads.
+  Merged pull requests arrive with action `merged` and no `merged_at` or
+  author, so the previous logic did not detect them. When the payload has
+  no author, the event actor is used for attribution.
 
 ## v1.1.2
 

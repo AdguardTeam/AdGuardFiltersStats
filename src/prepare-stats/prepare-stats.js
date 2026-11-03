@@ -6,6 +6,7 @@ import { getEventsFromCollection, mergeSyntheticEventsIntoCollection } from '../
 import { reconcileWindow } from '../tools/reconcile';
 import { getCommitsInWindow } from '../tools/gh-utils';
 import { buildCommitEvents } from '../tools/commit-events';
+import { getActivityKey } from '../tools/events-utils';
 import { logger } from '../tools/logger';
 import { EVENT_TYPES } from '../constants';
 
@@ -106,12 +107,21 @@ export const prepareStats = async (collectionPath, commonRequestData, timePeriod
 
     const commitEvents = await fetchCommitEvents(commonRequestData, timePeriod, repoMeta);
     const commitsAreAuthoritative = commitEvents !== null;
+    // Injected events carry the author from the REST API, while live events
+    // may have a reduced payload. Prefer the injected copy so the same
+    // activity is counted once and attributed to the pull request author.
+    const injectedActivityKeys = new Set(injectedEvents.map(getActivityKey).filter(Boolean));
+    const liveEventsWithoutSuperseded = liveEvents.filter((e) => {
+        const key = getActivityKey(e);
+        return !key || !injectedActivityKeys.has(key);
+    });
+    const storedAndInjected = [...liveEventsWithoutSuperseded, ...injectedEvents];
     // When the REST commit list is available it replaces PushEvents entirely:
     // a stored PushEvent carries no commit details and counts as one commit
     // for the pusher, even when several authors contributed to the push.
     const storedEvents = commitsAreAuthoritative
-        ? [...liveEvents, ...injectedEvents].filter((e) => e.type !== EVENT_TYPES.PUSH_EVENT)
-        : [...liveEvents, ...injectedEvents];
+        ? storedAndInjected.filter((e) => e.type !== EVENT_TYPES.PUSH_EVENT)
+        : storedAndInjected;
     const events = dedupeById([...storedEvents, ...(commitEvents || [])]);
 
     if (events.length === 0 && reconcileError) {

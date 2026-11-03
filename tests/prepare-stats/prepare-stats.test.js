@@ -38,6 +38,15 @@ const botClosedIssues = JSON.parse(
     readFileSync(path.join(reconcileFixtureDir, 'bot-closed-issues.json'), 'utf8'),
 );
 
+const writeCollection = async (events, prefix = 'stats-') => {
+    const dir = await mkdtemp(path.join(tmpdir(), prefix));
+    await writeFile(
+        path.join(dir, '2026-11-01.jsonl'),
+        `${events.map((e) => JSON.stringify(e)).join('\n')}\n`,
+    );
+    return dir;
+};
+
 describe('prepareStats — reconciles missing closures from REST', () => {
     beforeEach(() => {
         process.env.RECONCILE = 'true';
@@ -131,15 +140,6 @@ describe('prepareStats — commit reconciliation', () => {
         },
         parents: parents.map((parentSha) => ({ sha: parentSha })),
     });
-
-    const writeCollection = async (events) => {
-        const dir = await mkdtemp(path.join(tmpdir(), 'stats-commits-'));
-        await writeFile(
-            path.join(dir, '2026-11-01.jsonl'),
-            `${events.map((e) => JSON.stringify(e)).join('\n')}\n`,
-        );
-        return dir;
-    };
 
     const storedPush = {
         id: 'push-25986698927',
@@ -248,6 +248,76 @@ describe('prepareStats — commit reconciliation', () => {
         expect(stats.activitiesByUser.Yuki2718.totalComments).toBe(1);
         expect(stats.activitiesByUser.Yuki2718.totalCommits).toBe(0);
         expect(stats.activitiesByUser['Alex-302'].totalCommits).toBe(1);
+    });
+});
+
+describe('prepareStats — merged pull requests from reduced payloads', () => {
+    const prWindow = { since: '2026-11-01T00:00:00Z', until: '2026-11-01T23:59:59Z' };
+
+    const mergedEvent = (actor, pullId) => ({
+        id: `pr-merged-${pullId}`,
+        type: 'PullRequestEvent',
+        created_at: '2026-11-01T17:47:07Z',
+        actor: { login: actor },
+        payload: {
+            action: 'merged',
+            pull_request: {
+                id: pullId,
+                number: 245751,
+                head: { ref: 'Fix-#245573-streamable.com' },
+                base: { ref: 'master' },
+            },
+        },
+    });
+
+    it('counts the merged action and credits the actor', async () => {
+        const dir = await writeCollection([mergedEvent('mu-hun', 6001)]);
+
+        const stats = await prepareStats(
+            dir,
+            { owner: 'AdguardTeam', repo: 'AdguardFilters' },
+            prWindow,
+        );
+
+        expect(stats.repoStat.mergedPulls).toBe(1);
+        expect(stats.repoStat.newPulls).toBe(0);
+        expect(stats.activitiesByUser['mu-hun'].mergedPulls).toBe(1);
+        expect(stats.activitiesByUser['mu-hun'].newPulls).toBe(0);
+    });
+
+    describe('with reconciliation', () => {
+        beforeEach(() => {
+            process.env.RECONCILE = 'true';
+        });
+        afterEach(() => {
+            delete process.env.RECONCILE;
+        });
+
+        it('uses the REST author and does not count the live merge twice', async () => {
+            const dir = await writeCollection([mergedEvent('merger', 5001)]);
+            // eslint-disable-next-line global-require
+            const gh = require('../../src/tools/gh-utils');
+            gh.getClosedIssuesInWindow.mockResolvedValueOnce([]);
+            gh.getPullsInWindow.mockResolvedValueOnce([{
+                id: 5001,
+                number: 300,
+                created_at: '2026-11-01T08:00:00Z',
+                merged_at: '2026-11-01T09:00:00Z',
+                user: { id: 100, login: 'user1' },
+            }]);
+
+            const stats = await prepareStats(
+                dir,
+                { owner: 'AdguardTeam', repo: 'AdguardFilters' },
+                prWindow,
+            );
+
+            expect(stats.repoStat.mergedPulls).toBe(1);
+            expect(stats.activitiesByUser.user1.mergedPulls).toBe(1);
+            expect(stats.activitiesByUser.user1.newPulls).toBe(1);
+            // The live reduced event is replaced by the REST event.
+            expect(stats.activitiesByUser.merger).toBeUndefined();
+        });
     });
 });
 

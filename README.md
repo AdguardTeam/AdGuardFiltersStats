@@ -63,6 +63,10 @@ without a linked GitHub author or without a committer date are skipped.
 When the request fails, the tools emit a warning and fall back to counting
 one commit per stored `PushEvent`.
 
+Pull request events can also have a reduced payload: opened and merged
+pull requests may omit the author. When the author is missing, the event
+actor is used.
+
 Both tools also perform a **reconciliation** against the GitHub REST API
 for the requested window when `RECONCILE=true`. This recovers issue
 closures and PR open/merge events that were missed by the Events-API
