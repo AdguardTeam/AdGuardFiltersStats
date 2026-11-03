@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 [Keep a Changelog]: https://keepachangelog.com/en/1.0.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 
-## [Unreleased]
+## 1.1.3
 
 ### Fixed
 
@@ -20,11 +20,13 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
   Merged pull requests arrive with action `merged` and no `merged_at` or
   author, so the previous logic did not detect them. A pull request is
   credited to the author when the payload has one, and to the event actor
-  otherwise ([#4](https://github.com/AdguardTeam/AdGuardFiltersStats/issues/4)).
+  otherwise ([#4]).
 - A pull request review now counts only when it is submitted with a
   decision (approved, changes requested, or commented). An edit of an
   existing review no longer adds an activity point
-  ([#4](https://github.com/AdguardTeam/AdGuardFiltersStats/issues/4)).
+  ([#4]).
+
+[#4]: https://github.com/AdguardTeam/AdGuardFiltersStats/issues/4
 
 ## v1.1.2
 
