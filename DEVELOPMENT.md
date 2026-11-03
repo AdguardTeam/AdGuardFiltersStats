@@ -378,6 +378,12 @@ repository, and daily JSONL files older than `EVENT_EXPIRATION_DAYS`
 (30) are pruned during stat preparation. Run `github-poll` more
 frequently from CI to avoid gaps.
 
+Commit activity is different: it is read from the GitHub REST commits
+endpoint for the reporting window, not from the collected events. A
+missing commit count means the commits request failed (check the warning
+in the output and `GITHUB_TOKEN`) or the window has no `SINCE` bound.
+Polling more often does not recover commits.
+
 **`yarn poll` / `yarn stats` / `yarn run publish` does not reflect my
 changes**
 These scripts run the bundled files under `dist/`. Re-run `yarn build`

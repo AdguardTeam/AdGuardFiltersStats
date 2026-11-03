@@ -3,6 +3,7 @@ import {
     EVENT_TYPES,
     LABEL_NAMES,
     ACTION_NAMES,
+    DECISION_REVIEW_STATES,
     EXCLUDED_USERNAMES,
 } from '../constants';
 
@@ -71,13 +72,37 @@ const isClosedAsStale = (e) => isStale(e.payload.issue) && isStaleBotActor(e);
 /**
  * Determines if pull request is merged.
  *
- * @param {object} pull GitHub pull request event object.
+ * The Events API reports merged pull requests with action `merged`, and a
+ * reduced `pull_request` object that has no `merged_at` field. Older events
+ * report `action: closed` with `merged_at` set; both forms must count.
+ *
+ * @param {object} event GitHub pull request event object.
  *
  * @returns {boolean} True if the pull request has been merged.
  */
-const isMerged = (pull) => {
-    const mergeTime = pull.payload.pull_request.merged_at;
+const isMerged = (event) => {
+    if (event.payload.action === ACTION_NAMES.MERGED) {
+        return true;
+    }
+    const mergeTime = event.payload.pull_request?.merged_at;
     return typeof mergeTime === 'string';
+};
+
+/**
+ * Determines if a pull request review event is a review decision.
+ *
+ * The Events API sends a `created` event for a submitted review and an
+ * `updated` event when a review is edited. An edit does not add a review,
+ * so only `created` reviews with a decision state count as activity.
+ *
+ * @param {object} event GitHub pull request review event object.
+ *
+ * @returns {boolean} True if the event is a submitted review with a decision.
+ */
+const isDecisionReview = (event) => {
+    const { action, review } = event.payload;
+    return action === ACTION_NAMES.CREATED
+        && DECISION_REVIEW_STATES.includes(review?.state);
 };
 
 /**
@@ -244,6 +269,39 @@ const eventsToActivityByTime = (contributor) => {
 };
 
 /**
+ * Build an identity key for activity that reconciliation can recover from REST.
+ *
+ * Live Events-API events and synthetic reconciliation events describe the same
+ * activity but have different `id` values, so `dedupeById` cannot collapse
+ * them. The key is built from the underlying issue or pull request and the
+ * action that counts as activity.
+ *
+ * @param {object} event GitHub event object.
+ *
+ * @returns {string|null} Activity key, or null when the event is not recoverable activity.
+ */
+const getActivityKey = (event) => {
+    const { type, payload } = event;
+    if (type === EVENT_TYPES.ISSUES_EVENT && payload.action === ACTION_NAMES.CLOSED) {
+        const issueId = payload.issue?.id;
+        return issueId ? `issue-${issueId}-closed` : null;
+    }
+    if (type === EVENT_TYPES.PULL_REQUEST_EVENT) {
+        const pullId = payload.pull_request?.id;
+        if (!pullId) {
+            return null;
+        }
+        if (payload.action === ACTION_NAMES.OPENED) {
+            return `pr-${pullId}-opened`;
+        }
+        if (isMerged(event)) {
+            return `pr-${pullId}-merged`;
+        }
+    }
+    return null;
+};
+
+/**
  * Checks if event counts as activity and returns corresponding contributor.
  *
  * @param {object} event GitHub event object.
@@ -255,7 +313,14 @@ const getActivityAuthor = (event) => {
     const username = actor.login;
     let contributorName = null;
     switch (type) {
-        case EVENT_TYPES.PULL_REQUEST_REVIEW_EVENT:
+        case EVENT_TYPES.PULL_REQUEST_REVIEW_EVENT: {
+            // Count submitted reviews with a decision. Edits of an existing
+            // review are not a new review, so they do not count.
+            if (isDecisionReview(event)) {
+                contributorName = username;
+            }
+            break;
+        }
         case EVENT_TYPES.ISSUE_COMMENT_EVENT:
         case EVENT_TYPES.PUSH_EVENT: {
             contributorName = username;
@@ -272,11 +337,12 @@ const getActivityAuthor = (event) => {
         }
         case EVENT_TYPES.PULL_REQUEST_EVENT: {
             // count only newly opened & merged pulls
-            if (payload.action === ACTION_NAMES.OPENED
-                || (payload.action === ACTION_NAMES.CLOSED && typeof payload.pull_request.merged_at === 'string')) {
-                // merged pull request count for the one who opened it.
-                // note: user may be deleted, so contributorName may be undefined
-                contributorName = payload.pull_request.user?.login;
+            if (payload.action === ACTION_NAMES.OPENED || isMerged(event)) {
+                // Count the pull request for the one who opened it. The Events
+                // API can reduce `pull_request` to url/id/number/head/base, so
+                // the author is often absent. The actor is the user who opened
+                // or merged the pull request and is the best available fallback.
+                contributorName = payload.pull_request.user?.login || username;
             }
             break;
         }
@@ -298,11 +364,13 @@ export {
     isStaleBotActor,
     isClosedAsStale,
     isMerged,
+    isDecisionReview,
     isCreatedSince,
     isCreatedUntil,
     getCommitsCount,
     countEventsByType,
     eventsToActivityByTime,
     sortEventsByDate,
+    getActivityKey,
     getActivityAuthor,
 };

@@ -31,11 +31,12 @@ GitHub Actions) so that no events are lost, then run `github-stats` or
 
 An activity point is counted for each of the following user actions:
 
-- Commit pushed.
+- Commit added to the default branch.
 - Issue closed (unless closed by a bot).
 - Comment added to an Issue or Pull Request.
-- Pull Request review (approved or rejected).
-- Pull Request merged.
+- Pull request review submitted with a decision (approved, changes
+  requested, or commented).
+- Pull request merged, credited to the author.
 
 ### Daily JSONL storage
 
@@ -53,13 +54,35 @@ If `UNTIL` is omitted, the current time is used. Daily files older than
 
 ### Stats accuracy
 
-`github-publish` performs a **publish-time reconciliation** against the
-GitHub REST API for the requested window. This recovers issue closures
-and PR open/merge events that were missed by the Events-API poller
-(the Events API only retains the 300 most recent public events). When
-the REST API is unavailable the publisher emits a warning; if the
-window is also empty in the local collection it exits non-zero rather
-than producing an under-reported message.
+`github-stats` and `github-publish` read commit activity from the GitHub
+REST commits endpoint (`GET /repos/{owner}/{repo}/commits`) for the
+requested window. The Events API no longer includes the commits list in
+`PushEvent` payloads, so stored events cannot show who authored a commit
+or how many commits a push contains. The REST endpoint attributes each
+commit to its author and counts one activity point per commit. Commits
+without a linked GitHub author or without a committer date are skipped.
+When the request fails, the tools emit a warning and fall back to counting
+one commit per stored `PushEvent`.
+
+Pull request events can also have a reduced payload: opened and merged
+pull requests may omit the author, and a merged pull request arrives as
+`action: "merged"` without `merged_at`. The tools count both the
+`merged` action and `closed` with `merged_at`, credit the pull request to
+`pull_request.user.login` when it is present, and fall back to the event
+actor otherwise. GitHub sets the actor of a reduced `merged` event to the
+pull request author.
+
+A review adds an activity point only when it is submitted with a decision
+(approved, changes requested, or commented). An edit of an existing
+review does not add a point.
+
+Both tools also perform a **reconciliation** against the GitHub REST API
+for the requested window when `RECONCILE=true`. This recovers issue
+closures and PR open/merge events that were missed by the Events-API
+poller (the Events API only retains the 300 most recent public events).
+When the REST API is unavailable the tools emit a warning; if the window
+is also empty in the local collection they exit non-zero rather than
+producing an under-reported message.
 
 Per-poll diagnostics are appended to `<date>-metadata.json` (one
 record per poll) so polling gaps can be analyzed after the fact.
@@ -175,14 +198,14 @@ entries load a `.env` file from the working directory if one exists.
 
 ### Common variables
 
-| Variable          | Required for                             | Description                                                                                                       |
-| ----------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `COLLECTION_PATH` | All commands                             | Directory for daily JSONL files and metadata sidecars.                                                            |
-| `REPO`            | All commands                             | Target repository in `owner/repo_name` form.                                                                      |
-| `GITHUB_TOKEN`    | `poll` (recommended), `stats`, `publish` | GitHub Personal Access Token. Raises the API rate limit from 60 to 5000 requests per hour.                        |
-| `SINCE`           | `stats`, `publish`                       | Lower bound of the time window (ISO 8601). All stored events are used if omitted.                                 |
-| `UNTIL`           | `stats`, `publish`                       | Upper bound of the time window (ISO 8601). Defaults to now if omitted.                                            |
-| `RECONCILE`       | —                                        | Set to `true` to back-fill missing events from the GitHub REST API during `stats`/`publish`. Disabled by default. |
+| Variable          | Required for                             | Description                                                                                                                                                                      |
+| ----------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `COLLECTION_PATH` | All commands                             | Directory for daily JSONL files and metadata sidecars.                                                                                                                           |
+| `REPO`            | All commands                             | Target repository in `owner/repo_name` form.                                                                                                                                     |
+| `GITHUB_TOKEN`    | `poll` (recommended), `stats`, `publish` | GitHub Personal Access Token. Raises the API rate limit from 60 to 5000 requests per hour.                                                                                       |
+| `SINCE`           | `stats`, `publish`                       | Lower bound of the time window (ISO 8601). All stored events are used if omitted.                                                                                                |
+| `UNTIL`           | `stats`, `publish`                       | Upper bound of the time window (ISO 8601). Defaults to now if omitted.                                                                                                           |
+| `RECONCILE`       | —                                        | Set to `true` to back-fill missing issue and PR events from the GitHub REST API during `stats`/`publish`. Commit activity is read from the REST API. Disabled by default.        |
 
 ### Publishing variables
 

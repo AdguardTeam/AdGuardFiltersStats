@@ -46,6 +46,7 @@ export const POLL_GAP_THRESHOLD_MS = 90 * 60 * 1000;
 export const ENDPOINTS = {
     ISSUES: 'GET /repos/{owner}/{repo}/issues',
     GITHUB_EVENTS: 'GET /repos/{owner}/{repo}/events',
+    COMMITS: 'GET /repos/{owner}/{repo}/commits',
 };
 
 export const EVENT_TYPES = {
@@ -66,7 +67,21 @@ export const LABEL_NAMES = {
 export const ACTION_NAMES = {
     OPENED: 'opened',
     CLOSED: 'closed',
+    MERGED: 'merged',
+    CREATED: 'created',
 };
+
+/**
+ * Pull request review states that count as a review decision.
+ *
+ * A review with one of these states gives an activity point to the reviewer.
+ * Other states, such as `pending`, do not.
+ */
+export const DECISION_REVIEW_STATES = [
+    'approved',
+    'changes_requested',
+    'commented',
+];
 
 export const COLLECTION_FILE_EXTENSION = '.jsonl';
 

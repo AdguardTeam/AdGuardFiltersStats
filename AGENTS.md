@@ -38,6 +38,10 @@ The package ships three executables:
 - `github-publish` — compute statistics for a time period and publish them
   to a Slack channel.
 
+The stats commands read commit activity from the GitHub REST commits
+endpoint for the reporting window. The JSONL collection supplies the other
+event types.
+
 It is intended to be invoked from CI (e.g. GitHub Actions — see
 [examples/](./examples/)) on a regular schedule.
 
@@ -61,7 +65,8 @@ It is intended to be invoked from CI (e.g. GitHub Actions — see
 - **Project Type**: Single-package CLI tool (multi-binary).
 - **Performance Goals**: N/A. Runs are short-lived (seconds to a couple of
   minutes), bounded by the GitHub Events API which returns at most
-  `MAX_NUMBER_OF_MOST_RECENT_EVENTS` (300) events per repo.
+  `MAX_NUMBER_OF_MOST_RECENT_EVENTS` (300) events per repo and by the
+  commits endpoint pagination limit (300 pages of 100 commits per window).
 - **Constraints**:
     - GitHub Events API only exposes the 300 most recent events per repo, so
       `github-poll` must be scheduled frequently enough to avoid gaps.
@@ -214,8 +219,11 @@ Universal principles the codebase follows:
   through an `index.js` barrel. Importers MUST go through `index.js`
   rather than reaching into internal files.
 - **Data Flow Clarity** — events flow `GitHub API → JSONL files →
-  prepare-stats → {print-stats, publish-stats}`. There are no back
-  edges.
+  prepare-stats → {print-stats, publish-stats}`. `prepare-stats` also reads
+  commits for the reporting window from the GitHub REST commits endpoint;
+  this read is not persisted. Issue and PR reconciliation
+  (`RECONCILE=true`) additionally reads from the REST API and persists the
+  recovered synthetic events.
 - **Minimize Coupling, Maximize Cohesion** — Slack-specific logic lives
   entirely under `publish-utils/`; aggregation under `prepare-stats/`
   knows nothing about Slack or the console.
@@ -249,6 +257,9 @@ External services (GitHub REST API, Slack Web API, local filesystem)
 A higher layer may call any layer below it. No layer may depend on a layer
 above it. Sibling feature modules MUST NOT import from each other; if they
 need shared logic, lift it into `src/tools/` or `src/publish-utils/`.
+
+`prepare-stats` reaches the GitHub REST API through `src/tools/gh-utils.js`,
+so stats-time reads still follow the layer order.
 
 ### Style
 
