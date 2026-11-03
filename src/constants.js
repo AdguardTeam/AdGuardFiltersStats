@@ -68,7 +68,20 @@ export const ACTION_NAMES = {
     OPENED: 'opened',
     CLOSED: 'closed',
     MERGED: 'merged',
+    CREATED: 'created',
 };
+
+/**
+ * Pull request review states that count as a review decision.
+ *
+ * A review with one of these states gives an activity point to the reviewer.
+ * Other states, such as `pending`, do not.
+ */
+export const DECISION_REVIEW_STATES = [
+    'approved',
+    'changes_requested',
+    'commented',
+];
 
 export const COLLECTION_FILE_EXTENSION = '.jsonl';
 

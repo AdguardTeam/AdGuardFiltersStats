@@ -3,6 +3,7 @@ import {
     EVENT_TYPES,
     LABEL_NAMES,
     ACTION_NAMES,
+    DECISION_REVIEW_STATES,
     EXCLUDED_USERNAMES,
 } from '../constants';
 
@@ -85,6 +86,23 @@ const isMerged = (event) => {
     }
     const mergeTime = event.payload.pull_request?.merged_at;
     return typeof mergeTime === 'string';
+};
+
+/**
+ * Determines if a pull request review event is a review decision.
+ *
+ * The Events API sends a `created` event for a submitted review and an
+ * `updated` event when a review is edited. An edit does not add a review,
+ * so only `created` reviews with a decision state count as activity.
+ *
+ * @param {object} event GitHub pull request review event object.
+ *
+ * @returns {boolean} True if the event is a submitted review with a decision.
+ */
+const isDecisionReview = (event) => {
+    const { action, review } = event.payload;
+    return action === ACTION_NAMES.CREATED
+        && DECISION_REVIEW_STATES.includes(review?.state);
 };
 
 /**
@@ -295,7 +313,14 @@ const getActivityAuthor = (event) => {
     const username = actor.login;
     let contributorName = null;
     switch (type) {
-        case EVENT_TYPES.PULL_REQUEST_REVIEW_EVENT:
+        case EVENT_TYPES.PULL_REQUEST_REVIEW_EVENT: {
+            // Count submitted reviews with a decision. Edits of an existing
+            // review are not a new review, so they do not count.
+            if (isDecisionReview(event)) {
+                contributorName = username;
+            }
+            break;
+        }
         case EVENT_TYPES.ISSUE_COMMENT_EVENT:
         case EVENT_TYPES.PUSH_EVENT: {
             contributorName = username;
@@ -339,6 +364,7 @@ export {
     isStaleBotActor,
     isClosedAsStale,
     isMerged,
+    isDecisionReview,
     isCreatedSince,
     isCreatedUntil,
     getCommitsCount,

@@ -321,6 +321,42 @@ describe('prepareStats — merged pull requests from reduced payloads', () => {
     });
 });
 
+describe('prepareStats — pull request review decisions', () => {
+    const reviewWindow = { since: '2026-11-01T00:00:00Z', until: '2026-11-01T23:59:59Z' };
+
+    const reviewEvent = (id, action, state) => ({
+        id,
+        type: 'PullRequestReviewEvent',
+        created_at: '2026-11-01T10:00:00Z',
+        actor: { login: 'Alex-302' },
+        payload: {
+            action,
+            review: { id, state },
+            pull_request: { id: 5001, number: 300 },
+        },
+    });
+
+    it('counts submitted decisions and ignores edits of an existing review', async () => {
+        const dir = await writeCollection(
+            [
+                reviewEvent('review-1', 'created', 'approved'),
+                reviewEvent('review-2', 'created', 'changes_requested'),
+                reviewEvent('review-3', 'updated', 'commented'),
+            ],
+            'stats-reviews-',
+        );
+
+        const stats = await prepareStats(
+            dir,
+            { owner: 'AdguardTeam', repo: 'AdguardFilters' },
+            reviewWindow,
+        );
+
+        expect(stats.activitiesByUser['Alex-302'].pullRequestsReview).toBe(2);
+        expect(stats.activityStat['Alex-302']).toBe(2);
+    });
+});
+
 describe('prepareStats — hard fail on unrecoverable empty window', () => {
     beforeEach(() => {
         process.env.RECONCILE = 'true';

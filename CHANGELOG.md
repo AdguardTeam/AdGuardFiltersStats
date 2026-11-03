@@ -18,8 +18,12 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
   dropped commits that another user pushed.
 - Pull request activity is now counted from reduced Events API payloads.
   Merged pull requests arrive with action `merged` and no `merged_at` or
-  author, so the previous logic did not detect them. When the payload has
-  no author, the event actor is used for attribution.
+  author, so the previous logic did not detect them. A pull request is
+  credited to the author when the payload has one, and to the event actor
+  otherwise.
+- A pull request review now counts only when it is submitted with a
+  decision (approved, changes requested, or commented). An edit of an
+  existing review no longer adds an activity point.
 
 ## v1.1.2
 

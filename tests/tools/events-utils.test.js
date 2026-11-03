@@ -4,9 +4,15 @@ import {
     getActivityKey,
     getCommitsCount,
     isClosedAsStale,
+    isDecisionReview,
     isMerged,
 } from '../../src/tools/events-utils';
-import { EVENT_TYPES, LABEL_NAMES, EXCLUDED_USERNAMES } from '../../src/constants';
+import {
+    DECISION_REVIEW_STATES,
+    EVENT_TYPES,
+    LABEL_NAMES,
+    EXCLUDED_USERNAMES,
+} from '../../src/constants';
 
 const makeCloseEvent = ({ actor, labels }) => ({
     type: EVENT_TYPES.ISSUES_EVENT,
@@ -112,6 +118,32 @@ describe('isMerged — reduced Events API payloads', () => {
     });
 });
 
+describe('isDecisionReview — submitted reviews only', () => {
+    const reviewEvent = (action, state) => ({
+        type: EVENT_TYPES.PULL_REQUEST_REVIEW_EVENT,
+        payload: { action, review: { state } },
+    });
+
+    it.each(DECISION_REVIEW_STATES)(
+        'returns true for a created review with state %s',
+        (state) => {
+            expect(isDecisionReview(reviewEvent('created', state))).toBe(true);
+        },
+    );
+
+    it('returns false for an updated review', () => {
+        expect(isDecisionReview(reviewEvent('updated', 'changes_requested'))).toBe(false);
+    });
+
+    it('returns false for a created review without a decision state', () => {
+        expect(isDecisionReview(reviewEvent('created', 'pending'))).toBe(false);
+    });
+
+    it('returns false when the payload has no review', () => {
+        expect(isDecisionReview({ payload: { action: 'created' } })).toBe(false);
+    });
+});
+
 describe('getActivityAuthor — reduced pull_request payloads', () => {
     const reducedPullEvent = (action, actor) => ({
         type: EVENT_TYPES.PULL_REQUEST_EVENT,
@@ -136,6 +168,26 @@ describe('getActivityAuthor — reduced pull_request payloads', () => {
         event.payload.pull_request.user = { login: 'author' };
 
         expect(getActivityAuthor(event)).toBe('author');
+    });
+});
+
+describe('getActivityAuthor — pull request reviews', () => {
+    const reviewEvent = (action, state) => ({
+        type: EVENT_TYPES.PULL_REQUEST_REVIEW_EVENT,
+        actor: { login: 'reviewer' },
+        payload: { action, review: { state } },
+    });
+
+    it('credits a submitted review with a decision', () => {
+        expect(getActivityAuthor(reviewEvent('created', 'approved'))).toBe('reviewer');
+    });
+
+    it('does not credit an edited review', () => {
+        expect(getActivityAuthor(reviewEvent('updated', 'changes_requested'))).toBeNull();
+    });
+
+    it('does not credit a review without a decision state', () => {
+        expect(getActivityAuthor(reviewEvent('created', 'pending'))).toBeNull();
     });
 });
 
