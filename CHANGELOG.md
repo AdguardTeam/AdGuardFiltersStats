@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 [Keep a Changelog]: https://keepachangelog.com/en/1.0.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 
+## [Unreleased]
+
+### Fixed
+
+- Commit activity for a reporting window is now read from the GitHub
+  REST commits endpoint and credited to the commit author. The Events API
+  no longer includes the commits list in `PushEvent` payloads, so the
+  previous logic counted a whole push as one commit for the pusher and
+  dropped commits that another user pushed.
+
 ## v1.1.2
 
 ### Fixed

@@ -46,6 +46,7 @@ export const POLL_GAP_THRESHOLD_MS = 90 * 60 * 1000;
 export const ENDPOINTS = {
     ISSUES: 'GET /repos/{owner}/{repo}/issues',
     GITHUB_EVENTS: 'GET /repos/{owner}/{repo}/events',
+    COMMITS: 'GET /repos/{owner}/{repo}/commits',
 };
 
 export const EVENT_TYPES = {

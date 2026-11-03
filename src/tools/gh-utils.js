@@ -140,6 +140,20 @@ const ENDPOINT_ISSUES_LIST = 'GET /repos/{owner}/{repo}/issues';
 const ENDPOINT_PULLS_LIST = 'GET /repos/{owner}/{repo}/pulls';
 
 /**
+ * Maximum number of commits requested per page when listing commits.
+ */
+const COMMITS_PER_PAGE = 100;
+
+/**
+ * Maximum number of commit pages fetched for one reporting window.
+ *
+ * The limit guards against a runaway pagination loop. It covers several
+ * months of repository activity, and a window that exceeds it fails instead
+ * of returning a silently truncated commit list.
+ */
+const MAX_COMMIT_PAGES = 300;
+
+/**
  * Check if a timestamp falls within the specified time window.
  *
  * @param {string} iso ISO 8601 timestamp to check.
@@ -250,6 +264,62 @@ export const getPullsInWindow = async (commonRequestData, timePeriod) => {
             if (openedIn || mergedIn) {
                 collected.push(pr);
             }
+        }
+        const link = headers.link || '';
+        if (!link.includes('rel="next"') || data.length === 0) {
+            stop = true;
+        }
+        page += 1;
+    }
+    return collected;
+};
+
+/**
+ * List commits added to the default branch whose committer date falls in the time window.
+ * Walks pages newest-first until the last page is reached or the safety limit is hit.
+ * Commits are deduplicated by SHA.
+ *
+ * @param {{owner: string, repo: string}} commonRequestData Common request data for the GitHub API.
+ * @param {{since: string, until: string}} timePeriod Time window with ISO 8601 `since` and `until` bounds.
+ *
+ * @returns {Promise<Array<object>>} Array with commits in the time window.
+ */
+export const getCommitsInWindow = async (commonRequestData, timePeriod) => {
+    const { since, until } = timePeriod;
+    const sinceDate = new Date(since);
+    const untilDate = until ? new Date(until) : new Date();
+    const interval = { start: sinceDate, end: untilDate };
+    const collected = [];
+    const seenShas = new Set();
+    let page = 1;
+    let stop = false;
+    while (!stop) {
+        if (page > MAX_COMMIT_PAGES) {
+            // Returning a partial list here would be indistinguishable from a
+            // complete one, and the caller would drop the PushEvent fallback.
+            throw new Error(
+                `Commit list for the reporting window exceeds ${MAX_COMMIT_PAGES} pages `
+                + `of ${COMMITS_PER_PAGE}. Narrow the window.`,
+            );
+        }
+        const { data, headers } = await octokit.request(ENDPOINTS.COMMITS, {
+            ...commonRequestData,
+            since: sinceDate.toISOString(),
+            until: untilDate.toISOString(),
+            per_page: COMMITS_PER_PAGE,
+            page,
+        });
+        for (const commit of data) {
+            if (seenShas.has(commit.sha)) {
+                continue;
+            }
+            seenShas.add(commit.sha);
+            // GitHub filters commits by committer date, but keep the local
+            // check to guarantee the exact window bounds and inclusive edges.
+            if (!inWindow(commit.commit?.committer?.date, interval)) {
+                continue;
+            }
+            collected.push(commit);
         }
         const link = headers.link || '';
         if (!link.includes('rel="next"') || data.length === 0) {

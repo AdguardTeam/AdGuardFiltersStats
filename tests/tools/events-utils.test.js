@@ -1,6 +1,7 @@
 import {
     countEventsByType,
     getActivityAuthor,
+    getCommitsCount,
     isClosedAsStale,
 } from '../../src/tools/events-utils';
 import { EVENT_TYPES, LABEL_NAMES, EXCLUDED_USERNAMES } from '../../src/constants';
@@ -58,6 +59,29 @@ describe('countEventsByType — pull request counters', () => {
 
     it('returns 0 for merged PRs when contributor has no PR events', () => {
         expect(countEventsByType({ events: {} }, EVENT_TYPES.MERGED_PULL_EVENT)).toBe(0);
+    });
+});
+
+describe('getCommitsCount', () => {
+    it('counts every commit in a legacy PushEvent payload', () => {
+        const events = [{ payload: { commits: [{ sha: 'a' }, { sha: 'b' }] } }];
+
+        expect(getCommitsCount(events)).toBe(2);
+    });
+
+    it('falls back to one commit per push when the payload has no commits list', () => {
+        const events = [{ payload: { head: 'sha' } }];
+
+        expect(getCommitsCount(events)).toBe(1);
+    });
+
+    it('adds up commits across pushes', () => {
+        const events = [
+            { payload: { commits: [{ sha: 'a' }, { sha: 'b' }] } },
+            { payload: { commits: [{ sha: 'c' }] } },
+        ];
+
+        expect(getCommitsCount(events)).toBe(3);
     });
 });
 
