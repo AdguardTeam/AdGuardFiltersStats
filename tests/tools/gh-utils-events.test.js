@@ -156,4 +156,44 @@ describe('getGithubEvents', () => {
             .rejects.toThrow('GitHub API rate limit exceeded. Retry in 60 seconds');
         expect(mockRequest).toHaveBeenCalledTimes(1);
     });
+
+    it('reports retry-after ahead of the hourly reset for a secondary limit', async () => {
+        mockRequest.mockRejectedValue({
+            status: 403,
+            message: 'You have exceeded a secondary rate limit',
+            response: {
+                headers: {
+                    'x-ratelimit-remaining': '4321',
+                    'x-ratelimit-reset': '1800000000',
+                    'retry-after': '60',
+                },
+            },
+        });
+
+        const error = await getGithubEvents({ owner: 'o', repo: 'r' }).catch((e) => e);
+
+        expect(error.message).toBe('GitHub API rate limit exceeded. Retry in 60 seconds');
+        expect(error.rateLimitReached).toBe(true);
+        expect(error.rateLimitReset).toBeNull();
+        expect(mockRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it('exposes the rate limit state on the thrown error', async () => {
+        mockRequest.mockRejectedValue({
+            status: 403,
+            message: 'API rate limit exceeded',
+            response: {
+                headers: {
+                    'x-ratelimit-remaining': '0',
+                    'x-ratelimit-reset': '1800000000',
+                },
+            },
+        });
+
+        const error = await getGithubEvents({ owner: 'o', repo: 'r' }).catch((e) => e);
+
+        expect(error.message).toBe('GitHub API rate limit exceeded. Limit will reset at 2027-01-15T08:00:00.000Z');
+        expect(error.rateLimitReached).toBe(true);
+        expect(error.rateLimitReset).toBe('2027-01-15T08:00:00.000Z');
+    });
 });

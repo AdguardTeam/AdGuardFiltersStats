@@ -105,6 +105,9 @@ const buildRateLimitMessage = (headers) => {
  * @param {object} commonRequestData Common request data for GitHub API.
  *
  * @returns {Promise<object>} Object containing events array and metadata.
+ *
+ * @throws {Error & {rateLimitReached?: boolean, rateLimitReset?: string|null}} The request
+ * failure. A rate limit failure carries `rateLimitReached` and `rateLimitReset` for the caller.
  */
 export const getGithubEvents = async (commonRequestData = {}) => {
     const collectedPages = [];
@@ -144,11 +147,20 @@ export const getGithubEvents = async (commonRequestData = {}) => {
         }
     } catch (error) {
         if (isRateLimitError(error)) {
-            rateLimitReached = true;
-            throw new Error(buildRateLimitMessage(error.response?.headers ?? {}));
-        } else {
-            throw new Error(`Error fetching GitHub events: ${error.message}`);
+            const headers = error.response?.headers ?? {};
+            const rateLimitError = new Error(buildRateLimitMessage(headers));
+            // `getGithubEvents` throws instead of returning metadata, so the
+            // caller needs these on the error to record a rate-limited run.
+            rateLimitError.rateLimitReached = true;
+            // `x-ratelimit-reset` belongs to the primary quota. A secondary
+            // limit reports `retry-after` instead and has no reset time here.
+            rateLimitError.rateLimitReset = headers[X_RATE_LIMIT_REMAINING_HEADER] === '0'
+                ? parseRateLimitReset(headers)
+                : null;
+            throw rateLimitError;
         }
+
+        throw new Error(`Error fetching GitHub events: ${error.message}`);
     }
 
     // Log information about the collection
