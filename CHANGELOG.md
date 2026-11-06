@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 [Keep a Changelog]: https://keepachangelog.com/en/1.0.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 
+## 1.1.4
+
+### Fixed
+
+- `github-poll` now retries a failed GitHub API request up to three times
+  with exponential backoff. A transient network error or a truncated
+  response body no longer aborts the whole poll.
+
 ## 1.1.3
 
 ### Fixed

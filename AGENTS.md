@@ -284,6 +284,11 @@ conventions not covered by the linter.
   IIFE in `try/catch`, log via `console.error`, and `process.exit(1)` on
   failure. Library functions SHOULD throw normal `Error` instances; let
   the caller decide how to recover.
+- **Retries**: GitHub API requests MUST retry transient failures (network
+  errors, malformed response bodies, 5xx and 429 responses) with
+  exponential backoff through `withRetry` from
+  [src/tools/retry-utils.js](./src/tools/retry-utils.js). Do NOT retry
+  client errors (other 4xx) or rate-limit responses.
 - **Logging**: Use `console.log` for progress, `console.warn` for
   recoverable issues (rate-limit warnings, missing optional data), and
   `console.error` for fatal errors. Disable the `no-console` ESLint rule

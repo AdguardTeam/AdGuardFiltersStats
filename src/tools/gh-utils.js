@@ -2,6 +2,7 @@ import { Octokit } from '@octokit/core';
 import { isBefore, isWithinInterval } from 'date-fns';
 import { ENDPOINTS, MAX_NUMBER_OF_MOST_RECENT_EVENTS } from '../constants';
 import { logger } from './logger';
+import { withRetry } from './retry-utils';
 
 const { GITHUB_TOKEN } = process.env;
 
@@ -29,6 +30,9 @@ const X_RATE_LIMIT_REMAINING_HEADER = 'x-ratelimit-remaining';
 /**
  * Get GitHub events from with pagination.
  *
+ * A request that fails with a transient error is retried three times
+ * before the collection fails.
+ *
  * @param {object} commonRequestData Common request data for GitHub API.
  *
  * @returns {Promise<object>} Object containing events array and metadata.
@@ -44,10 +48,10 @@ export const getGithubEvents = async (commonRequestData = {}) => {
         let currentLink = 'rel="next"';
         let pageNumber = 1;
         while (currentLink && currentLink.includes('rel="next"')) {
-            const { headers, data } = await octokit.request(ENDPOINTS.GITHUB_EVENTS, {
-                ...commonRequestData,
-                page: pageNumber,
-            });
+            const requestParams = { ...commonRequestData, page: pageNumber };
+            const { headers, data } = await withRetry(
+                () => octokit.request(ENDPOINTS.GITHUB_EVENTS, requestParams),
+            );
 
             // Track rate limit information
             rateLimitRemaining = parseInt(headers[X_RATE_LIMIT_REMAINING_HEADER], 10);
