@@ -2,10 +2,46 @@ import { Octokit } from '@octokit/core';
 import { isBefore, isWithinInterval } from 'date-fns';
 import { ENDPOINTS, MAX_NUMBER_OF_MOST_RECENT_EVENTS } from '../constants';
 import { logger } from './logger';
+import {
+    RETRY_AFTER_HEADER,
+    X_RATE_LIMIT_REMAINING_HEADER,
+    isRateLimitError,
+    withRetry,
+} from './retry-utils';
 
 const { GITHUB_TOKEN } = process.env;
 
+/**
+ * Timeout for a single GitHub API request in milliseconds.
+ *
+ * `node-fetch` has no timeout by default, and its own `timeout` option
+ * does not abort a response that stalls after the headers. The timeout is
+ * therefore applied as an abort signal created for each request attempt.
+ */
+const REQUEST_TIMEOUT_MS = 30 * 1000;
+
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
+
+/**
+ * Perform a GitHub API request with a timeout that covers the whole attempt.
+ *
+ * The abort signal is created per call, so a retry gets a fresh timeout
+ * and an aborted request, including a stalled response body, is rejected
+ * and its socket is closed. `@octokit/request` reports an aborted request
+ * as status 500, which `withRetry` treats as transient.
+ *
+ * @param {string} endpoint Octokit endpoint.
+ * @param {object} [params] Request parameters.
+ *
+ * @returns {Promise<object>} Octokit response.
+ */
+const requestWithTimeout = (endpoint, params = {}) => octokit.request(endpoint, {
+    ...params,
+    request: {
+        ...params.request,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    },
+});
 
 /**
  * Maximum number of pages to fetch per paginated request to prevent runaway loops.
@@ -20,18 +56,58 @@ const MAX_PAGES = 30;
 const X_RATE_LIMIT_RESET_HEADER = 'x-ratelimit-reset';
 
 /**
- * Header name for remaining API requests.
+ * Parse the rate limit reset time from response headers.
  *
- * @see {@link https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28#checking-the-status-of-your-rate-limit}
+ * @param {object} headers Response headers.
+ *
+ * @returns {string|null} ISO 8601 reset time, or `null` when it is absent or invalid.
  */
-const X_RATE_LIMIT_REMAINING_HEADER = 'x-ratelimit-remaining';
+const parseRateLimitReset = (headers) => {
+    const reset = parseInt(headers[X_RATE_LIMIT_RESET_HEADER], 10);
+
+    return Number.isNaN(reset) ? null : new Date(reset * 1000).toISOString();
+};
+
+/**
+ * Build the error message for a GitHub API rate limit response.
+ *
+ * GitHub sends the regular `x-ratelimit-*` headers with every response, so
+ * `retry-after` is checked first: a secondary limit reports the wait time,
+ * while a primary limit reports the reset time when no requests remain.
+ *
+ * @param {object} headers Headers of the rate limit response.
+ *
+ * @returns {string} Human-readable rate limit message.
+ */
+const buildRateLimitMessage = (headers) => {
+    const retryAfter = parseInt(headers[RETRY_AFTER_HEADER], 10);
+
+    if (!Number.isNaN(retryAfter)) {
+        return `GitHub API rate limit exceeded. Retry in ${retryAfter} seconds`;
+    }
+
+    const reset = parseRateLimitReset(headers);
+
+    if (headers[X_RATE_LIMIT_REMAINING_HEADER] === '0' && reset !== null) {
+        return `GitHub API rate limit exceeded. Limit will reset at ${reset}`;
+    }
+
+    return 'GitHub API rate limit exceeded.';
+};
 
 /**
  * Get GitHub events from with pagination.
  *
+ * An Events API page request that fails with a transient error is
+ * retried three times before the collection fails. A rate limit
+ * response is not retried and reports when the limit resets.
+ *
  * @param {object} commonRequestData Common request data for GitHub API.
  *
  * @returns {Promise<object>} Object containing events array and metadata.
+ *
+ * @throws {Error & {rateLimitReached?: boolean, rateLimitReset?: string|null}} The request
+ * failure. A rate limit failure carries `rateLimitReached` and `rateLimitReset` for the caller.
  */
 export const getGithubEvents = async (commonRequestData = {}) => {
     const collectedPages = [];
@@ -44,10 +120,11 @@ export const getGithubEvents = async (commonRequestData = {}) => {
         let currentLink = 'rel="next"';
         let pageNumber = 1;
         while (currentLink && currentLink.includes('rel="next"')) {
-            const { headers, data } = await octokit.request(ENDPOINTS.GITHUB_EVENTS, {
-                ...commonRequestData,
-                page: pageNumber,
-            });
+            const requestParams = { ...commonRequestData, page: pageNumber };
+            const { headers, data } = await withRetry(
+                () => requestWithTimeout(ENDPOINTS.GITHUB_EVENTS, requestParams),
+                { label: `Events API page ${pageNumber}` },
+            );
 
             // Track rate limit information
             rateLimitRemaining = parseInt(headers[X_RATE_LIMIT_REMAINING_HEADER], 10);
@@ -69,15 +146,21 @@ export const getGithubEvents = async (commonRequestData = {}) => {
             }
         }
     } catch (error) {
-        if (error.status === 403 && error.response?.headers?.[X_RATE_LIMIT_REMAINING_HEADER] === '0') {
-            rateLimitReached = true;
-            rateLimitReset = parseInt(error.response.headers[X_RATE_LIMIT_RESET_HEADER], 10);
-            throw new Error(
-                `GitHub API rate limit exceeded. Limit will reset at ${new Date(rateLimitReset * 1000).toISOString()}`,
-            );
-        } else {
-            throw new Error(`Error fetching GitHub events: ${error.message}`);
+        if (isRateLimitError(error)) {
+            const headers = error.response?.headers ?? {};
+            const rateLimitError = new Error(buildRateLimitMessage(headers));
+            // `getGithubEvents` throws instead of returning metadata, so the
+            // caller needs these on the error to record a rate-limited run.
+            rateLimitError.rateLimitReached = true;
+            // `x-ratelimit-reset` belongs to the primary quota. A secondary
+            // limit reports `retry-after` instead and has no reset time here.
+            rateLimitError.rateLimitReset = headers[X_RATE_LIMIT_REMAINING_HEADER] === '0'
+                ? parseRateLimitReset(headers)
+                : null;
+            throw rateLimitError;
         }
+
+        throw new Error(`Error fetching GitHub events: ${error.message}`);
     }
 
     // Log information about the collection
@@ -121,7 +204,7 @@ export const getOpenIssues = async (commonRequestData = {}) => {
     let currentLink = 'rel="next"';
     let pageNumber = 1;
     while (currentLink && currentLink.includes('rel="next"')) {
-        const { headers, data } = await octokit.request(ENDPOINTS.ISSUES, {
+        const { headers, data } = await requestWithTimeout(ENDPOINTS.ISSUES, {
             ...commonRequestData,
             state: 'open',
             page: pageNumber,
@@ -189,7 +272,7 @@ export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => 
             logger.warn(`⚠️ Pagination safety limit (${MAX_PAGES} pages) reached for getClosedIssuesInWindow`);
             break;
         }
-        const { data, headers } = await octokit.request(ENDPOINT_ISSUES_LIST, {
+        const { data, headers } = await requestWithTimeout(ENDPOINT_ISSUES_LIST, {
             ...commonRequestData,
             state: 'closed',
             since,
@@ -246,7 +329,7 @@ export const getPullsInWindow = async (commonRequestData, timePeriod) => {
             logger.warn(`⚠️ Pagination safety limit (${MAX_PAGES} pages) reached for getPullsInWindow`);
             break;
         }
-        const { data, headers } = await octokit.request(ENDPOINT_PULLS_LIST, {
+        const { data, headers } = await requestWithTimeout(ENDPOINT_PULLS_LIST, {
             ...commonRequestData,
             state: 'all',
             sort: 'updated',
@@ -302,7 +385,7 @@ export const getCommitsInWindow = async (commonRequestData, timePeriod) => {
                 + `of ${COMMITS_PER_PAGE}. Narrow the window.`,
             );
         }
-        const { data, headers } = await octokit.request(ENDPOINTS.COMMITS, {
+        const { data, headers } = await requestWithTimeout(ENDPOINTS.COMMITS, {
             ...commonRequestData,
             since: sinceDate.toISOString(),
             until: untilDate.toISOString(),

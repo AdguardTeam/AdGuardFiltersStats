@@ -81,6 +81,8 @@ jest.mock('../../src/tools/gh-utils', () => ({
 
 // eslint-disable-next-line import/first
 import { pollEvents } from '../../src/poll-events';
+// eslint-disable-next-line import/first
+import { getGithubEvents } from '../../src/tools/gh-utils';
 
 describe('pollEvents — metadata is append-only', () => {
     it('writes one new record per call to the per-day file', async () => {
@@ -101,5 +103,31 @@ describe('pollEvents — metadata is append-only', () => {
         } finally {
             jest.useRealTimers();
         }
+    });
+
+    it('records a rate-limited failure in the metadata', async () => {
+        const error = Object.assign(
+            new Error('GitHub API rate limit exceeded. Retry in 60 seconds'),
+            {
+                rateLimitReached: true,
+                rateLimitReset: null,
+            },
+        );
+        getGithubEvents.mockRejectedValueOnce(error);
+
+        const dir = await mkdtemp(path.join(tmpdir(), 'poll-rate-limit-'));
+        const result = await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+        expect(result.success).toBe(false);
+        expect(result.metadata.rateLimitReached).toBe(true);
+
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const parsed = JSON.parse(
+            await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
+        );
+        expect(parsed).toHaveLength(1);
+        expect(parsed[0].rateLimitReached).toBe(true);
+        expect(parsed[0].rateLimitReset).toBeNull();
+        expect(parsed[0].error).toBe(error.message);
     });
 });

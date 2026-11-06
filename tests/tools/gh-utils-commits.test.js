@@ -85,6 +85,7 @@ describe('getCommitsInWindow', () => {
             per_page: 100,
             page: 1,
         });
+        expect(requests[0].params.request.signal).toBeInstanceOf(AbortSignal);
         expect(requests[1].params.page).toBe(2);
     });
 

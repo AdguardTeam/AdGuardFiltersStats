@@ -143,6 +143,11 @@ removes duplicates already present in today's JSONL file, and appends
 new ones. The metadata sidecar is updated in place. Re-running on the
 same day is safe and idempotent.
 
+An Events API page request that fails with a transient error is retried
+up to three times with exponential backoff before the poll fails. A rate
+limit response is not retried and reports when the limit resets or how
+long to wait. GitHub API requests time out after 30 seconds.
+
 #### Metadata fields
 
 The `YYYY-MM-DD-metadata.json` sidecar contains a JSON **array** of records, one per
