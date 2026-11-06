@@ -36,9 +36,10 @@ const sleep = (ms) => new Promise((resolve) => {
 /**
  * Report whether an error is a GitHub rate limit response.
  *
- * A primary rate limit response carries `x-ratelimit-remaining: 0` with
- * a 403 or a 429 status. A secondary rate limit response carries
- * `retry-after`. GitHub returns a bare 429 only for rate limiting, so it
+ * A response with `x-ratelimit-remaining: 0` is a primary rate limit
+ * whatever its status, although GitHub normally uses 403 or 429. A
+ * secondary rate limit response carries `retry-after` with a 403 or a
+ * 429 status. GitHub returns a bare 429 only for rate limiting, so it
  * counts as well. Retrying inside the window GitHub asks to wait out
  * cannot succeed, so such responses are never retried.
  *
@@ -47,7 +48,9 @@ const sleep = (ms) => new Promise((resolve) => {
  * @returns {boolean} `true` when GitHub rate-limited the request.
  */
 export const isRateLimitError = (error) => {
-    if (error?.status === 429) {
+    const status = error?.status;
+
+    if (status === 429) {
         return true;
     }
 
@@ -57,8 +60,11 @@ export const isRateLimitError = (error) => {
         return false;
     }
 
-    return headers[X_RATE_LIMIT_REMAINING_HEADER] === '0'
-        || headers[RETRY_AFTER_HEADER] !== undefined;
+    if (headers[X_RATE_LIMIT_REMAINING_HEADER] === '0') {
+        return true;
+    }
+
+    return status === 403 && headers[RETRY_AFTER_HEADER] !== undefined;
 };
 
 /**

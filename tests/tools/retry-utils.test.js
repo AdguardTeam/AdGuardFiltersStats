@@ -54,6 +54,15 @@ describe('retry-utils', () => {
             expect(isRateLimitError(buildError('Secondary rate limit exceeded', 429, {
                 'retry-after': '60',
             }))).toBe(true);
+            expect(isRateLimitError(buildError('Secondary rate limit exceeded', 403, {
+                'retry-after': '60',
+            }))).toBe(true);
+        });
+
+        it('does not treat retry-after on a server error as a rate limit response', () => {
+            expect(isRateLimitError(buildError('Service unavailable', 503, {
+                'retry-after': '60',
+            }))).toBe(false);
         });
 
         it('detects a bare 429 response', () => {
@@ -76,6 +85,9 @@ describe('retry-utils', () => {
 
         it('treats server responses as transient', () => {
             expect(isTransientError(buildError('Server error', 500))).toBe(true);
+            expect(isTransientError(buildError('Service unavailable', 503, {
+                'retry-after': '60',
+            }))).toBe(true);
         });
 
         it('treats client responses as permanent', () => {
