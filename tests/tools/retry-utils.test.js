@@ -1,4 +1,14 @@
+import { setImmediate as realSetImmediate } from 'timers';
 import { isRateLimitError, isTransientError, withRetry } from '../../src/tools/retry-utils';
+
+/**
+ * Let the pending promise callbacks run while fake timers are installed.
+ *
+ * @returns {Promise<void>} Promise that resolves after the microtask queue is drained.
+ */
+const flushPromises = () => new Promise((resolve) => {
+    realSetImmediate(resolve);
+});
 
 /**
  * Build an error with an optional HTTP status and response headers.
@@ -176,6 +186,35 @@ describe('retry-utils', () => {
 
             expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('Events API page 8'));
             expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('500'));
+        });
+
+        it('does not retry before the backoff delay elapses', async () => {
+            setTimeoutMock.mockRestore();
+            jest.useFakeTimers();
+
+            try {
+                const request = jest.fn()
+                    .mockRejectedValueOnce(buildError('Server error', 500))
+                    .mockResolvedValue('ok');
+
+                const result = withRetry(request);
+
+                // Let the first attempt fail and schedule the retry timer.
+                await flushPromises();
+                expect(request).toHaveBeenCalledTimes(1);
+
+                jest.advanceTimersByTime(999);
+                await flushPromises();
+                expect(request).toHaveBeenCalledTimes(1);
+
+                jest.advanceTimersByTime(1);
+                await flushPromises();
+
+                await expect(result).resolves.toBe('ok');
+                expect(request).toHaveBeenCalledTimes(2);
+            } finally {
+                jest.useRealTimers();
+            }
         });
     });
 });
