@@ -11,9 +11,13 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 
 ### Fixed
 
-- `github-poll` now retries a failed GitHub API request up to three times
-  with exponential backoff. A transient network error or a truncated
-  response body no longer aborts the whole poll.
+- GitHub API requests now time out after 30 seconds, so a stalled
+  response fails instead of keeping the command hanging.
+- `github-poll` now retries a failed GitHub Events API page request up to
+  three times with exponential backoff. A transient network error or a
+  truncated response body no longer aborts the whole poll.
+- A rate limit response is not retried, and the error reports when the
+  limit resets or how long to wait.
 
 ## 1.1.3
 
