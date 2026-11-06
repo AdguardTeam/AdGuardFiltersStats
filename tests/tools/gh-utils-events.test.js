@@ -8,7 +8,7 @@ jest.mock('@octokit/core', () => {
 // eslint-disable-next-line import/first
 import { getGithubEvents } from '../../src/tools/gh-utils';
 
-const { request: mockRequest } = jest.requireMock('@octokit/core');
+const { request: mockRequest, Octokit: mockOctokit } = jest.requireMock('@octokit/core');
 
 /**
  * Build an error with an optional HTTP status.
@@ -52,6 +52,12 @@ describe('getGithubEvents', () => {
         jest.restoreAllMocks();
     });
 
+    it('creates the client with a request timeout', () => {
+        expect(mockOctokit).toHaveBeenCalledWith(expect.objectContaining({
+            request: { timeout: expect.any(Number) },
+        }));
+    });
+
     it('returns events from one page without a retry', async () => {
         mockRequest.mockResolvedValue(buildResponse([{ id: '1' }, { id: '2' }]));
 
@@ -76,6 +82,7 @@ describe('getGithubEvents', () => {
         expect(result.events.map((event) => event.id)).toEqual(['1', '2']);
         expect(result.metadata.pagesCollected).toBe(2);
         expect(mockRequest).toHaveBeenCalledTimes(3);
+        expect(mockRequest.mock.calls.map(([, params]) => params.page)).toEqual([1, 1, 2]);
     });
 
     it('fails after three retries of the same page', async () => {
@@ -84,6 +91,7 @@ describe('getGithubEvents', () => {
         await expect(getGithubEvents({ owner: 'o', repo: 'r' }))
             .rejects.toThrow('Error fetching GitHub events: Unexpected end of JSON input');
         expect(mockRequest).toHaveBeenCalledTimes(4);
+        expect(mockRequest.mock.calls.map(([, params]) => params.page)).toEqual([1, 1, 1, 1]);
     });
 
     it('does not retry a rate limit response', async () => {
@@ -99,7 +107,40 @@ describe('getGithubEvents', () => {
         });
 
         await expect(getGithubEvents({ owner: 'o', repo: 'r' }))
-            .rejects.toThrow(/GitHub API rate limit exceeded/);
+            .rejects.toThrow('GitHub API rate limit exceeded. Limit will reset at 2027-01-15T08:00:00.000Z');
+        expect(mockRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not retry a primary rate limit 429 response', async () => {
+        mockRequest.mockRejectedValue({
+            status: 429,
+            message: 'API rate limit exceeded',
+            response: {
+                headers: {
+                    'x-ratelimit-remaining': '0',
+                    'x-ratelimit-reset': '1800000000',
+                },
+            },
+        });
+
+        await expect(getGithubEvents({ owner: 'o', repo: 'r' }))
+            .rejects.toThrow('GitHub API rate limit exceeded. Limit will reset at 2027-01-15T08:00:00.000Z');
+        expect(mockRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not retry a secondary rate limit response', async () => {
+        mockRequest.mockRejectedValue({
+            status: 429,
+            message: 'You have exceeded a secondary rate limit',
+            response: {
+                headers: {
+                    'retry-after': '60',
+                },
+            },
+        });
+
+        await expect(getGithubEvents({ owner: 'o', repo: 'r' }))
+            .rejects.toThrow('GitHub API rate limit exceeded. Retry in 60 seconds');
         expect(mockRequest).toHaveBeenCalledTimes(1);
     });
 });

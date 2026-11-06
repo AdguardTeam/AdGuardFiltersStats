@@ -2,11 +2,23 @@ import { Octokit } from '@octokit/core';
 import { isBefore, isWithinInterval } from 'date-fns';
 import { ENDPOINTS, MAX_NUMBER_OF_MOST_RECENT_EVENTS } from '../constants';
 import { logger } from './logger';
-import { withRetry } from './retry-utils';
+import { isRateLimitError, withRetry } from './retry-utils';
 
 const { GITHUB_TOKEN } = process.env;
 
-const octokit = new Octokit({ auth: GITHUB_TOKEN });
+/**
+ * Timeout for a single GitHub API request in milliseconds.
+ *
+ * `node-fetch` has no timeout by default, so a response that stalls
+ * mid-body would keep the request pending instead of failing and being
+ * retried.
+ */
+const REQUEST_TIMEOUT_MS = 30 * 1000;
+
+const octokit = new Octokit({
+    auth: GITHUB_TOKEN,
+    request: { timeout: REQUEST_TIMEOUT_MS },
+});
 
 /**
  * Maximum number of pages to fetch per paginated request to prevent runaway loops.
@@ -28,10 +40,42 @@ const X_RATE_LIMIT_RESET_HEADER = 'x-ratelimit-reset';
 const X_RATE_LIMIT_REMAINING_HEADER = 'x-ratelimit-remaining';
 
 /**
+ * Header name for the time GitHub asks to wait before a retry.
+ */
+const RETRY_AFTER_HEADER = 'retry-after';
+
+/**
+ * Build the error message for a GitHub API rate limit response.
+ *
+ * The primary limit reports the reset time in `x-ratelimit-reset`, while
+ * a secondary limit reports the wait time in `retry-after`.
+ *
+ * @param {object} headers Headers of the rate limit response.
+ *
+ * @returns {string} Human-readable rate limit message.
+ */
+const buildRateLimitMessage = (headers) => {
+    const reset = parseInt(headers[X_RATE_LIMIT_RESET_HEADER], 10);
+
+    if (!Number.isNaN(reset)) {
+        return `GitHub API rate limit exceeded. Limit will reset at ${new Date(reset * 1000).toISOString()}`;
+    }
+
+    const retryAfter = parseInt(headers[RETRY_AFTER_HEADER], 10);
+
+    if (!Number.isNaN(retryAfter)) {
+        return `GitHub API rate limit exceeded. Retry in ${retryAfter} seconds`;
+    }
+
+    return 'GitHub API rate limit exceeded.';
+};
+
+/**
  * Get GitHub events from with pagination.
  *
- * A request that fails with a transient error is retried three times
- * before the collection fails.
+ * An Events API page request that fails with a transient error is
+ * retried three times before the collection fails. A rate limit
+ * response is not retried and reports when the limit resets.
  *
  * @param {object} commonRequestData Common request data for GitHub API.
  *
@@ -51,6 +95,7 @@ export const getGithubEvents = async (commonRequestData = {}) => {
             const requestParams = { ...commonRequestData, page: pageNumber };
             const { headers, data } = await withRetry(
                 () => octokit.request(ENDPOINTS.GITHUB_EVENTS, requestParams),
+                { label: `Events API page ${pageNumber}` },
             );
 
             // Track rate limit information
@@ -73,12 +118,9 @@ export const getGithubEvents = async (commonRequestData = {}) => {
             }
         }
     } catch (error) {
-        if (error.status === 403 && error.response?.headers?.[X_RATE_LIMIT_REMAINING_HEADER] === '0') {
+        if (isRateLimitError(error)) {
             rateLimitReached = true;
-            rateLimitReset = parseInt(error.response.headers[X_RATE_LIMIT_RESET_HEADER], 10);
-            throw new Error(
-                `GitHub API rate limit exceeded. Limit will reset at ${new Date(rateLimitReset * 1000).toISOString()}`,
-            );
+            throw new Error(buildRateLimitMessage(error.response?.headers ?? {}));
         } else {
             throw new Error(`Error fetching GitHub events: ${error.message}`);
         }
