@@ -8,7 +8,7 @@ jest.mock('@octokit/core', () => {
 // eslint-disable-next-line import/first
 import { getGithubEvents } from '../../src/tools/gh-utils';
 
-const { request: mockRequest, Octokit: mockOctokit } = jest.requireMock('@octokit/core');
+const { request: mockRequest } = jest.requireMock('@octokit/core');
 
 /**
  * Build an error with an optional HTTP status.
@@ -38,13 +38,15 @@ const buildResponse = (data, link) => ({
 });
 
 describe('getGithubEvents', () => {
+    let consoleWarnSpy;
+
     beforeEach(() => {
         jest.spyOn(global, 'setTimeout').mockImplementation((callback) => {
             callback();
             return 0;
         });
         jest.spyOn(console, 'log').mockImplementation(() => {});
-        jest.spyOn(console, 'warn').mockImplementation(() => {});
+        consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
         mockRequest.mockReset();
     });
 
@@ -52,10 +54,16 @@ describe('getGithubEvents', () => {
         jest.restoreAllMocks();
     });
 
-    it('creates the client with a request timeout', () => {
-        expect(mockOctokit).toHaveBeenCalledWith(expect.objectContaining({
-            request: { timeout: expect.any(Number) },
-        }));
+    it('sets a 30 second timeout signal on every request', async () => {
+        const timeoutSpy = jest.spyOn(AbortSignal, 'timeout');
+        const { signal } = new AbortController();
+        timeoutSpy.mockReturnValue(signal);
+        mockRequest.mockResolvedValue(buildResponse([{ id: '1' }]));
+
+        await getGithubEvents({ owner: 'o', repo: 'r' });
+
+        expect(timeoutSpy).toHaveBeenCalledWith(30 * 1000);
+        expect(mockRequest.mock.calls[0][1].request.signal).toBe(signal);
     });
 
     it('returns events from one page without a retry', async () => {
@@ -69,6 +77,7 @@ describe('getGithubEvents', () => {
     });
 
     it('retries a failed page and returns all pages', async () => {
+        const timeoutSpy = jest.spyOn(AbortSignal, 'timeout');
         mockRequest
             .mockRejectedValueOnce(buildError('invalid json response body', 500))
             .mockResolvedValueOnce(buildResponse(
@@ -83,6 +92,10 @@ describe('getGithubEvents', () => {
         expect(result.metadata.pagesCollected).toBe(2);
         expect(mockRequest).toHaveBeenCalledTimes(3);
         expect(mockRequest.mock.calls.map(([, params]) => params.page)).toEqual([1, 1, 2]);
+        // Every attempt, including the retry, gets its own timeout signal.
+        expect(timeoutSpy).toHaveBeenCalledTimes(3);
+        expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('Events API page 1'));
+        expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('500'));
     });
 
     it('fails after three retries of the same page', async () => {

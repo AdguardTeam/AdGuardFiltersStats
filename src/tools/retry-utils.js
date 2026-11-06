@@ -15,12 +15,12 @@ const RETRY_BASE_DELAY_MS = 1000;
 /**
  * Header name for the remaining GitHub API rate limit quota.
  */
-const X_RATE_LIMIT_REMAINING_HEADER = 'x-ratelimit-remaining';
+export const X_RATE_LIMIT_REMAINING_HEADER = 'x-ratelimit-remaining';
 
 /**
  * Header name for the time GitHub asks to wait before a retry.
  */
-const RETRY_AFTER_HEADER = 'retry-after';
+export const RETRY_AFTER_HEADER = 'retry-after';
 
 /**
  * Wait for the given number of milliseconds.
