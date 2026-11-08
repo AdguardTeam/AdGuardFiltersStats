@@ -12,7 +12,8 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 ### Fixed
 
 - GitHub API requests now time out after 30 seconds, so a stalled
-  response fails instead of keeping the command hanging.
+  response fails instead of keeping the command hanging. The error says
+  that the request timed out.
 - `github-poll` now retries a failed GitHub Events API page request up to
   three times with exponential backoff. A transient network error or a
   truncated response body no longer aborts the whole poll.
