@@ -106,6 +106,8 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
             },
         };
     } catch (error) {
+        const rateLimitReached = error?.rateLimitReached === true;
+        const rateLimitReset = error?.rateLimitReset ?? null;
         const today = format(new Date(), 'yyyy-MM-dd');
         try {
             await appendMetadataRecord(
@@ -116,8 +118,8 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
                     pagesCollected: 0,
                     eventsInFile: 0,
                     rateLimitRemaining: null,
-                    rateLimitReached: false,
-                    rateLimitReset: null,
+                    rateLimitReached,
+                    rateLimitReset,
                     oldestEventAt: null,
                     newestEventAt: null,
                     gapSuspected: false,
@@ -138,6 +140,8 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
             metadata: {
                 timestamp: new Date().toISOString(),
                 error: error.message,
+                rateLimitReached,
+                rateLimitReset,
             },
         };
     }
