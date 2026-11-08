@@ -11,6 +11,7 @@ permissions:
 jobs:
   poll:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -39,10 +40,12 @@ jobs:
           default_author: github_actions
   notify:
     needs: poll
-    # Run this job only if the previous job failed
+    # Run this job only if the previous job failed or was cancelled by a
+    # timeout.
     # Note: 'always()' is needed to run the notify job even if the poll job was failed
-    if: ${{ always() && needs.poll.result == 'failure' }}
+    if: ${{ always() && (needs.poll.result == 'failure' || needs.poll.result == 'cancelled') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Send Slack notification
         uses: 8398a7/action-slack@v3
