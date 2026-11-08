@@ -98,6 +98,31 @@ describe('getGithubEvents', () => {
         expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('500'));
     });
 
+    it('names the timeout when the abort signal fires', async () => {
+        jest.spyOn(AbortSignal, 'timeout').mockReturnValue(AbortSignal.abort());
+        mockRequest
+            .mockRejectedValueOnce(buildError('The user aborted a request.', 500))
+            .mockResolvedValueOnce(buildResponse([{ id: '1' }]));
+
+        const result = await getGithubEvents({ owner: 'o', repo: 'r' });
+
+        expect(result.events.map((event) => event.id)).toEqual(['1']);
+        // The aborted attempt keeps its status, so it is still retried.
+        expect(mockRequest).toHaveBeenCalledTimes(2);
+        expect(consoleWarnSpy).toHaveBeenCalledWith(
+            expect.stringContaining('Request timed out after 30000 ms'),
+        );
+    });
+
+    it('reports the timeout when every attempt is aborted', async () => {
+        jest.spyOn(AbortSignal, 'timeout').mockReturnValue(AbortSignal.abort());
+        mockRequest.mockRejectedValue(buildError('The user aborted a request.', 500));
+
+        await expect(getGithubEvents({ owner: 'o', repo: 'r' }))
+            .rejects.toThrow('Error fetching GitHub events: Request timed out after 30000 ms');
+        expect(mockRequest).toHaveBeenCalledTimes(4);
+    });
+
     it('fails after three retries of the same page', async () => {
         mockRequest.mockRejectedValue(buildError('Unexpected end of JSON input', 500));
 

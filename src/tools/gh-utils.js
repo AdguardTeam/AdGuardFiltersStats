@@ -34,14 +34,36 @@ const octokit = new Octokit({ auth: GITHUB_TOKEN });
  * @param {object} [params] Request parameters.
  *
  * @returns {Promise<object>} Octokit response.
+ *
+ * @throws {Error & {status?: number}} The request failure. A request that the
+ * timeout aborted fails with a message that names the timeout.
  */
-const requestWithTimeout = (endpoint, params = {}) => octokit.request(endpoint, {
-    ...params,
-    request: {
-        ...params.request,
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    },
-});
+const requestWithTimeout = async (endpoint, params = {}) => {
+    const signal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+
+    try {
+        return await octokit.request(endpoint, {
+            ...params,
+            request: {
+                ...params.request,
+                signal,
+            },
+        });
+    } catch (error) {
+        if (!signal.aborted) {
+            throw error;
+        }
+
+        // `node-fetch` rejects an aborted request with "The user aborted a
+        // request." and `@octokit/request` wraps it into an error with status
+        // 500, so the retry warning and the final error do not say that our
+        // own timeout fired. Keep the error object: it holds the status and
+        // the response, and `withRetry` still treats it as transient.
+        error.message = `Request timed out after ${REQUEST_TIMEOUT_MS} ms`;
+
+        throw error;
+    }
+};
 
 /**
  * Maximum number of pages to fetch per paginated request to prevent runaway loops.
