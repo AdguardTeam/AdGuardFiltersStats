@@ -36,9 +36,11 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install package
+        timeout-minutes: 10
         run: yarn install
 
       - name: Build package
+        timeout-minutes: 5
         run: yarn build
 
       - name: Log time range
@@ -48,6 +50,7 @@ jobs:
           echo "  UNTIL: ${{ github.event.inputs.until }}"
 
       - name: Publish repo stats
+        timeout-minutes: 20
         env:
           SLACK_OAUTH_TOKEN: ${{ secrets.SLACK_OAUTH_TOKEN }}
           SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
@@ -59,10 +62,12 @@ jobs:
         run: yarn run publish
   notify:
     needs: stats
-    # Run this job only if the previous job failed or was cancelled by a
-    # timeout.
-    # Note: 'always()' is needed to run the notify job even if the poll job was failed
-    if: ${{ always() && (needs.stats.result == 'failure' || needs.stats.result == 'cancelled') }}
+    # Run this job only if the previous job failed. A step timeout fails the
+    # step, so a hung step reaches here as a failure. A job-level timeout or
+    # a manual cancel leaves the result `cancelled`, and GitHub Actions
+    # cannot tell them apart, so such runs are not reported.
+    # Note: 'always()' is needed to run the notify job even if the previous job was failed
+    if: ${{ always() && needs.stats.result == 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

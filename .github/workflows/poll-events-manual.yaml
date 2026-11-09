@@ -22,28 +22,34 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install package
+        timeout-minutes: 10
         run: yarn install
 
       - name: Build package
+        timeout-minutes: 5
         run: yarn build
 
       - name: Poll Github events
+        timeout-minutes: 15
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COLLECTION_PATH: ./stats-data
           REPO: AdguardTeam/AdguardFilters
         run: yarn poll
       - name: commit artifacts
+        timeout-minutes: 5
         uses: EndBug/add-and-commit@v9
         with:
           message: Events collection update
           default_author: github_actions
   notify:
     needs: poll
-    # Run this job only if the previous job failed or was cancelled by a
-    # timeout.
+    # Run this job only if the previous job failed. A step timeout fails the
+    # step, so a hung step reaches here as a failure. A job-level timeout or
+    # a manual cancel leaves the result `cancelled`, and GitHub Actions
+    # cannot tell them apart, so such runs are not reported.
     # Note: 'always()' is needed to run the notify job even if the poll job was failed
-    if: ${{ always() && (needs.poll.result == 'failure' || needs.poll.result == 'cancelled') }}
+    if: ${{ always() && needs.poll.result == 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
