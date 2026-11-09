@@ -71,6 +71,15 @@ const requestWithTimeout = async (endpoint, params = {}) => {
 const MAX_PAGES = 30;
 
 /**
+ * Number of events requested per page.
+ *
+ * The Events API returns at most {@link MAX_NUMBER_OF_MOST_RECENT_EVENTS}
+ * events, so 100 per page keeps the walk to three pages. With the retry
+ * budget, that bounds one poll to well under the workflow step timeout.
+ */
+const EVENTS_PER_PAGE = 100;
+
+/**
  * Header names for rate limit information.
  *
  * @see {@link https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28#checking-the-status-of-your-rate-limit}
@@ -142,7 +151,11 @@ export const getGithubEvents = async (commonRequestData = {}) => {
         let currentLink = 'rel="next"';
         let pageNumber = 1;
         while (currentLink && currentLink.includes('rel="next"')) {
-            const requestParams = { ...commonRequestData, page: pageNumber };
+            const requestParams = {
+                ...commonRequestData,
+                per_page: EVENTS_PER_PAGE,
+                page: pageNumber,
+            };
             const { headers, data } = await withRetry(
                 () => requestWithTimeout(ENDPOINTS.GITHUB_EVENTS, requestParams),
                 { label: `Events API page ${pageNumber}` },
