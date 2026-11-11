@@ -11,33 +11,35 @@ permissions:
 jobs:
   poll:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout repository
+        timeout-minutes: 2
         uses: actions/checkout@v5
 
       - name: Setup Node.js environment
+        timeout-minutes: 2
         uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install package
-        timeout-minutes: 10
+        timeout-minutes: 3
         run: yarn install
 
       - name: Build package
-        timeout-minutes: 5
+        timeout-minutes: 2
         run: yarn build
 
       - name: Poll Github events
-        timeout-minutes: 15
+        timeout-minutes: 12
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COLLECTION_PATH: ./stats-data
           REPO: AdguardTeam/AdguardFilters
         run: yarn poll
       - name: commit artifacts
-        timeout-minutes: 5
+        timeout-minutes: 3
         uses: EndBug/add-and-commit@v9
         with:
           message: Events collection update
@@ -48,16 +50,17 @@ jobs:
           fetch: false
   notify:
     needs: poll
-    # Run this job only if the previous job failed. A step timeout fails the
-    # step, so a hung step reaches here as a failure. A job-level timeout or
-    # a manual cancel leaves the result `cancelled`, and GitHub Actions
-    # cannot tell them apart, so such runs are not reported.
+    # Run this job only if the previous job failed. Every step in the job has
+    # its own timeout, so a hung step reaches here as a failure. A job-level
+    # timeout or a manual cancel leaves the result `cancelled`, and GitHub
+    # Actions cannot tell them apart, so such runs are not reported.
     # Note: 'always()' is needed to run the notify job even if the poll job was failed
     if: ${{ always() && needs.poll.result == 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Send Slack notification
+        timeout-minutes: 2
         uses: 8398a7/action-slack@v3
         with:
           status: failure
