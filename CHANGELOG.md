@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 [Keep a Changelog]: https://keepachangelog.com/en/1.0.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 
+## 1.1.5
+
+### Changed
+
+- `github-poll` now requests 100 events per page from the GitHub Events API,
+  so a full walk takes three requests instead of ten and `pagesCollected` in
+  the run metadata reports 3 instead of 10.
+
 ## 1.1.4
 
 ### Fixed
