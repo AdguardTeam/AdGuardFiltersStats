@@ -75,7 +75,9 @@ const MAX_PAGES = 30;
  *
  * The Events API returns at most {@link MAX_NUMBER_OF_MOST_RECENT_EVENTS}
  * events, so 100 per page keeps the walk to three pages. With the retry
- * budget, that bounds one poll to well under the workflow step timeout.
+ * budget, that bounds the Events API walk to well under the workflow step
+ * timeout. `reconcileWindow` runs in the same step after a detected gap,
+ * and its page walks use `MAX_PAGES`.
  */
 const EVENTS_PER_PAGE = 100;
 

@@ -95,6 +95,9 @@ describe('getGithubEvents', () => {
         expect(result.metadata.pagesCollected).toBe(2);
         expect(mockRequest).toHaveBeenCalledTimes(3);
         expect(mockRequest.mock.calls.map(([, params]) => params.page)).toEqual([1, 1, 2]);
+        // Every request carries the page size, including later pages and the
+        // retry of the first page.
+        expect(mockRequest.mock.calls.map(([, params]) => params.per_page)).toEqual([100, 100, 100]);
         // Every attempt, including the retry, gets its own timeout signal.
         expect(timeoutSpy).toHaveBeenCalledTimes(3);
         expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('Events API page 1'));
