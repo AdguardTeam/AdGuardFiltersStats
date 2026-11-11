@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Setup Node.js environment
-        timeout-minutes: 2
+        timeout-minutes: 4
         uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -34,7 +34,7 @@ jobs:
         run: yarn build
 
       - name: Poll Github events
-        timeout-minutes: 12
+        timeout-minutes: 10
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COLLECTION_PATH: ./stats-data
