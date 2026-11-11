@@ -1,7 +1,6 @@
 name: CI
 
-description: Lints, tests, and builds on pull requests and pushes to master.
-
+# Lints, tests, and builds on pull requests and pushes to master.
 env:
   NODE_VERSION: 22.17.0
 
