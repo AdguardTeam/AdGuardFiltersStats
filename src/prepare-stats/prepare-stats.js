@@ -97,6 +97,9 @@ export const prepareStats = async (collectionPath, commonRequestData, timePeriod
             reconcileError = reconciliation.error;
             logger.warn(`⚠️ Reconciliation failed: ${reconciliation.error}. Stats may under-report.`);
         } else {
+            if (reconciliation.truncated) {
+                logger.warn('⚠️ Reconciliation stopped before it covered the window. Stats may under-report.');
+            }
             injectedEvents = reconciliation.injectedEvents;
             if (injectedEvents.length > 0) {
                 // Persist so future reports inherit the recovered events

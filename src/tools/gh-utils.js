@@ -12,11 +12,12 @@ import {
 const { GITHUB_TOKEN } = process.env;
 
 /**
- * Timeout for a single GitHub API request in milliseconds.
+ * Default timeout for a single GitHub API request in milliseconds.
  *
  * `node-fetch` has no timeout by default, and its own `timeout` option
  * does not abort a response that stalls after the headers. The timeout is
  * therefore applied as an abort signal created for each request attempt.
+ * A paginated walk can shorten it to the remaining time budget.
  */
 const REQUEST_TIMEOUT_MS = 30 * 1000;
 
@@ -32,14 +33,16 @@ const octokit = new Octokit({ auth: GITHUB_TOKEN });
  *
  * @param {string} endpoint Octokit endpoint.
  * @param {object} [params] Request parameters.
+ * @param {number} [timeoutMs] Request timeout in milliseconds. A paginated
+ * walk shortens it to the remaining time budget.
  *
  * @returns {Promise<object>} Octokit response.
  *
  * @throws {Error & {status?: number}} The request failure. A request that the
  * timeout aborted fails with a message that names the timeout.
  */
-const requestWithTimeout = async (endpoint, params = {}) => {
-    const signal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+const requestWithTimeout = async (endpoint, params = {}, timeoutMs = REQUEST_TIMEOUT_MS) => {
+    const signal = AbortSignal.timeout(timeoutMs);
 
     try {
         return await octokit.request(endpoint, {
@@ -59,7 +62,8 @@ const requestWithTimeout = async (endpoint, params = {}) => {
         // 500, so the retry warning and the final error do not say that our
         // own timeout fired. Keep the error object: it holds the status and
         // the response, and `withRetry` still treats it as transient.
-        error.message = `Request timed out after ${REQUEST_TIMEOUT_MS} ms`;
+        error.message = `Request timed out after ${timeoutMs} ms`;
+        error.timedOut = true;
 
         throw error;
     }
@@ -77,7 +81,7 @@ const MAX_PAGES = 30;
  * events, so 100 per page keeps the walk to three pages. With the retry
  * budget, that bounds the Events API walk to well under the workflow step
  * timeout. `reconcileWindow` runs in the same step after a detected gap,
- * and its page walks use `MAX_PAGES`.
+ * and its page walks use `MAX_PAGES` and a shared time budget.
  */
 const EVENTS_PER_PAGE = 100;
 
@@ -289,15 +293,75 @@ const inWindow = (iso, interval) => {
 };
 
 /**
+ * Shared time budget for one gap reconciliation.
+ *
+ * `reconcileWindow` creates one budget and passes it to both REST walks,
+ * which run in parallel. A walk that reaches the deadline stops before the
+ * next page and sets `truncated`, so the caller can report an incomplete
+ * backfill.
+ *
+ * @typedef {object} WalkBudget
+ * @property {number} deadline Epoch milliseconds after which no page is requested.
+ * @property {boolean} truncated `true` once a walk stops before the window is covered.
+ * @property {boolean} [progress] `true` to log each page to stdout.
+ */
+
+/**
+ * Fetch one page of a paginated REST walk within the time budget.
+ *
+ * The request timeout is capped by the remaining budget, so a slow page
+ * cannot run past the deadline. When the deadline is reached, the walk
+ * returns `null` and the caller marks the budget as truncated.
+ *
+ * @param {string} endpoint Octokit endpoint.
+ * @param {object} params Request parameters.
+ * @param {WalkBudget|undefined} budget Shared walk budget.
+ * @param {string} label Walk name for log messages.
+ * @param {number} page Page number.
+ *
+ * @returns {Promise<object|null>} Octokit response, or `null` when the budget is spent.
+ */
+const fetchPageWithinBudget = async (endpoint, params, budget, label, page) => {
+    const remainingMs = budget ? budget.deadline - Date.now() : REQUEST_TIMEOUT_MS;
+
+    if (budget && remainingMs <= 0) {
+        logger.warn(`⚠️ ${label}: time budget reached before page ${page}, returning a partial list`);
+        return null;
+    }
+
+    const budgetCapped = Boolean(budget) && remainingMs < REQUEST_TIMEOUT_MS;
+    const timeoutMs = Math.min(REQUEST_TIMEOUT_MS, remainingMs);
+    if (budget && budget.progress) {
+        logger.log(`${label}: fetching page ${page}, ${Math.ceil(remainingMs / 1000)} s left`);
+    }
+
+    try {
+        return await requestWithTimeout(endpoint, params, timeoutMs);
+    } catch (error) {
+        // Only the abort of a budget-capped request means truncation. A real
+        // API error that lands after the deadline must keep its own message.
+        if (budgetCapped && error.timedOut) {
+            logger.warn(`⚠️ ${label}: time budget reached on page ${page}, returning a partial list`);
+            return null;
+        }
+        throw error;
+    }
+};
+
+/**
  * List closed (true) issues whose `closed_at` falls in the time window.
  * Filters out pull-request rows (GitHub's /issues endpoint mixes them in).
  *
  * @param {{owner: string, repo: string}} commonRequestData Common request data for the GitHub API.
  * @param {{since: string, until: string}} timePeriod Time window with ISO 8601 `since` and `until` bounds.
+ * @param {object} [options] Walk options.
+ * @param {WalkBudget} [options.budget] Shared time budget. The walk sets
+ * `budget.truncated` when it stops before the window is covered.
  *
  * @returns {Promise<Array<object>>} Array with closed issues in the time window.
  */
-export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => {
+export const getClosedIssuesInWindow = async (commonRequestData, timePeriod, options = {}) => {
+    const { budget } = options;
     const { since, until } = timePeriod;
     const sinceDate = new Date(since);
     const interval = { start: sinceDate, end: new Date(until) };
@@ -307,17 +371,33 @@ export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => 
     while (!stop) {
         if (page > MAX_PAGES) {
             logger.warn(`⚠️ Pagination safety limit (${MAX_PAGES} pages) reached for getClosedIssuesInWindow`);
+            if (budget) {
+                budget.truncated = true;
+            }
             break;
         }
-        const { data, headers } = await requestWithTimeout(ENDPOINT_ISSUES_LIST, {
-            ...commonRequestData,
-            state: 'closed',
-            since,
-            sort: 'updated',
-            direction: 'desc',
-            per_page: 100,
+        const response = await fetchPageWithinBudget(
+            ENDPOINT_ISSUES_LIST,
+            {
+                ...commonRequestData,
+                state: 'closed',
+                since,
+                sort: 'updated',
+                direction: 'desc',
+                per_page: 100,
+                page,
+            },
+            budget,
+            'getClosedIssuesInWindow',
             page,
-        });
+        );
+        if (!response) {
+            if (budget) {
+                budget.truncated = true;
+            }
+            break;
+        }
+        const { data, headers } = response;
         for (const row of data) {
             if (row.pull_request) {
                 continue;
@@ -351,10 +431,14 @@ export const getClosedIssuesInWindow = async (commonRequestData, timePeriod) => 
  *
  * @param {{owner: string, repo: string}} commonRequestData Common request data for the GitHub API.
  * @param {{since: string, until: string}} timePeriod Time window with ISO 8601 `since` and `until` bounds.
+ * @param {object} [options] Walk options.
+ * @param {WalkBudget} [options.budget] Shared time budget. The walk sets
+ * `budget.truncated` when it stops before the window is covered.
  *
  * @returns {Promise<Array<object>>} Array with pull requests in the time window.
  */
-export const getPullsInWindow = async (commonRequestData, timePeriod) => {
+export const getPullsInWindow = async (commonRequestData, timePeriod, options = {}) => {
+    const { budget } = options;
     const { since, until } = timePeriod;
     const sinceDate = new Date(since);
     const interval = { start: sinceDate, end: new Date(until) };
@@ -364,16 +448,32 @@ export const getPullsInWindow = async (commonRequestData, timePeriod) => {
     while (!stop) {
         if (page > MAX_PAGES) {
             logger.warn(`⚠️ Pagination safety limit (${MAX_PAGES} pages) reached for getPullsInWindow`);
+            if (budget) {
+                budget.truncated = true;
+            }
             break;
         }
-        const { data, headers } = await requestWithTimeout(ENDPOINT_PULLS_LIST, {
-            ...commonRequestData,
-            state: 'all',
-            sort: 'updated',
-            direction: 'desc',
-            per_page: 100,
+        const response = await fetchPageWithinBudget(
+            ENDPOINT_PULLS_LIST,
+            {
+                ...commonRequestData,
+                state: 'all',
+                sort: 'updated',
+                direction: 'desc',
+                per_page: 100,
+                page,
+            },
+            budget,
+            'getPullsInWindow',
             page,
-        });
+        );
+        if (!response) {
+            if (budget) {
+                budget.truncated = true;
+            }
+            break;
+        }
+        const { data, headers } = response;
         for (const pr of data) {
             if (isBefore(new Date(pr.updated_at), sinceDate)) {
                 stop = true;

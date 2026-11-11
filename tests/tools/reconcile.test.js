@@ -168,4 +168,45 @@ describe('reconcileWindow', () => {
         expect(result.error).toContain('issues fail');
         expect(result.error).toContain('pulls fail');
     });
+
+    it('gives both walks the same budget and reports no truncation', async () => {
+        const budgets = [];
+        getClosedIssuesInWindow.mockImplementationOnce(async (c, t, { budget }) => {
+            budgets.push(budget);
+            return [];
+        });
+        getPullsInWindow.mockImplementationOnce(async (c, t, { budget }) => {
+            budgets.push(budget);
+            return [];
+        });
+        const before = Date.now();
+
+        const result = await reconcileWindow(
+            commonRequestData,
+            timePeriod,
+            repoMeta,
+            { budgetMs: 1000, progress: true },
+        );
+
+        expect(budgets).toHaveLength(2);
+        expect(budgets[0]).toBe(budgets[1]);
+        expect(budgets[0].progress).toBe(true);
+        expect(budgets[0].deadline).toBeGreaterThanOrEqual(before + 1000);
+        expect(budgets[0].deadline).toBeLessThanOrEqual(Date.now() + 1000);
+        expect(result.truncated).toBe(false);
+    });
+
+    it('reports truncation when a walk stops early', async () => {
+        getClosedIssuesInWindow.mockImplementationOnce(async (c, t, { budget }) => {
+            // eslint-disable-next-line no-param-reassign -- the real walk marks the shared budget
+            budget.truncated = true;
+            return [];
+        });
+        getPullsInWindow.mockResolvedValueOnce([]);
+
+        const result = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
+
+        expect(result.truncated).toBe(true);
+        expect(result.error).toBeNull();
+    });
 });

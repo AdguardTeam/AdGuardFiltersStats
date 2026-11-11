@@ -7,6 +7,19 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 [Keep a Changelog]: https://keepachangelog.com/en/1.0.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 
+## [Unreleased]
+
+### Fixed
+
+- `github-poll` now stops a gap reconciliation at a 3-minute budget, so a
+  slow REST backfill cannot overrun the poll step timeout and the collected
+  events are still committed. A failed backfill does not count as the last
+  successful poll, so the next poll retries it. Each page is logged, and
+  the poll metadata records `backfillTruncated` and `backfillError`.
+- `github-stats` and `github-publish` with `RECONCILE=true` now use the same
+  3-minute budget and warn when reconciliation cannot cover the whole
+  window.
+
 ## 1.1.5
 
 ### Changed

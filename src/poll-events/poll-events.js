@@ -45,10 +45,16 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
         const today = format(new Date(), 'yyyy-MM-dd');
         const metadataPath = path.join(collectionPath, `${today}-metadata.json`);
         const prevRecords = await readMetadataRecords(metadataPath);
-        const lastSuccessful = prevRecords.filter((r) => !r.error).at(-1);
+        // A failed backfill must not move the window forward: the next poll
+        // retries the gap from the last successful poll.
+        const lastSuccessful = prevRecords
+            .filter((r) => !r.error && !r.backfillError)
+            .at(-1);
 
         let gapSuspected = false;
         let gapWindowSince = null;
+        let backfillTruncated = false;
+        let backfillError = null;
         if (lastSuccessful) {
             const msSinceLast = Date.now() - new Date(lastSuccessful.timestamp).getTime();
             const oldestEventTime = new Date(oldestEventAt).getTime();
@@ -61,22 +67,33 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
             }
         }
 
-        // Backfill gap window from REST when a gap is detected
-        if (gapSuspected && gapWindowSince) {
+        // Backfill the missing event window. After a slow poll the current
+        // batch can reach back past the previous newest event, so an empty or
+        // inverted window needs no backfill.
+        const windowMissing = gapWindowSince
+            && new Date(oldestEventAt) > new Date(gapWindowSince);
+        if (windowMissing) {
             const gapWindow = { since: gapWindowSince, until: oldestEventAt };
             const repoMeta = { id: 0, name: `${commonRequestData.owner}/${commonRequestData.repo}` };
             const {
                 injectedEvents,
-                error: backfillError,
+                error: reconciliationError,
+                truncated,
             } = await reconcileWindow(
                 commonRequestData,
                 gapWindow,
                 repoMeta,
+                { progress: true },
             );
+            backfillTruncated = truncated;
+            backfillError = reconciliationError;
             if (backfillError) {
                 logger.warn(`⚠️ Gap detected but backfill failed: ${backfillError}`);
             } else if (injectedEvents.length > 0) {
                 await mergeSyntheticEventsIntoCollection(collectionPath, injectedEvents);
+            }
+            if (backfillTruncated) {
+                logger.warn('⚠️ Gap backfill stopped before it covered the window; some events may be missing.');
             }
         }
 
@@ -92,6 +109,8 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
             oldestEventAt,
             newestEventAt,
             gapSuspected,
+            backfillTruncated,
+            backfillError,
             error: null,
             collectionPath,
             repo: `${commonRequestData.owner}/${commonRequestData.repo}`,
@@ -123,6 +142,8 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
                     oldestEventAt: null,
                     newestEventAt: null,
                     gapSuspected: false,
+                    backfillTruncated: false,
+                    backfillError: null,
                     error: error.message,
                     collectionPath,
                     repo: `${commonRequestData.owner}/${commonRequestData.repo}`,

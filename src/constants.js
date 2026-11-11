@@ -36,12 +36,25 @@ export const MILLISECONDS_IN_DAY = 1000 * 60 * 60 * 24;
 export const EVENT_EXPIRATION_DAYS = 30;
 
 /**
- * Minimum time (ms) between two successful polls before a gap is suspected.
+ * Minimum time (ms) between two polls with successful backfills before a gap
+ * is suspected.
  *
  * 90 minutes — exceeds the recommended 60-min poll cadence but stays below
  * the point where the GitHub Events API (300-event cap) would start losing data.
  */
 export const POLL_GAP_THRESHOLD_MS = 90 * 60 * 1000;
+
+/**
+ * Time budget (ms) for one gap reconciliation.
+ *
+ * The poll step has a 10-minute timeout, and the Events API walk can take
+ * about 381 s in the worst case: three pages, each with four attempts of
+ * 30 s plus 7 s of backoff. 180 s leaves about 39 s of the step for the
+ * rest of the poll, so a slow reconciliation stops before the step timeout
+ * and the collected events are still committed. The stats and publish
+ * steps have a 15-minute timeout, so the same budget fits them too.
+ */
+export const RECONCILE_BUDGET_MS = 180 * 1000;
 
 export const ENDPOINTS = {
     ISSUES: 'GET /repos/{owner}/{repo}/issues',

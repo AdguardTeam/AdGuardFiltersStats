@@ -128,6 +128,8 @@ describe('pollEvents — metadata is append-only', () => {
         expect(parsed).toHaveLength(1);
         expect(parsed[0].rateLimitReached).toBe(true);
         expect(parsed[0].rateLimitReset).toBeNull();
+        expect(parsed[0].backfillTruncated).toBe(false);
+        expect(parsed[0].backfillError).toBeNull();
         expect(parsed[0].error).toBe(error.message);
     });
 });

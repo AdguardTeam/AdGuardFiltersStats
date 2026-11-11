@@ -1,4 +1,5 @@
 import { getClosedIssuesInWindow, getPullsInWindow } from './gh-utils';
+import { RECONCILE_BUDGET_MS } from '../constants';
 
 /**
  * Convert an ISO 8601 string to epoch milliseconds.
@@ -138,18 +139,38 @@ export const buildSyntheticEvents = ({
  * Fetch REST data for the window and return synthetic events plus a
  * diagnostic record. Never throws — REST failure surfaces in `error`.
  *
+ * Both walks share one time budget, so a slow reconciliation stops before
+ * the calling step timeout. A walk that reaches the deadline returns the
+ * pages collected so far and sets `truncated`. The 30-page safety limit
+ * sets the same flag.
+ *
  * @param {{owner: string, repo: string}} commonRequestData Common request data for the GitHub API.
  * @param {TimePeriod} timePeriod Object with `since` and `until` ISO date strings.
  * @param {RepoMeta} repoMeta Repository metadata object with `id` and `name` fields,
  * used for synthetic event construction.
+ * @param {object} [options] Reconcile options.
+ * @param {number} [options.budgetMs] Time budget for the whole reconciliation in milliseconds.
+ * @param {boolean} [options.progress] Log each page of a long-running poll step.
  *
- * @returns {Promise<{injectedEvents: Array<object>, endpointsSucceeded: number, error: string|null}>} Object
- * with synthetic events array, count of successful REST endpoint calls, and error message if any.
+ * @returns {Promise<{injectedEvents: Array<object>, endpointsSucceeded: number,
+ * truncated: boolean, error: string|null}>} Object with synthetic events array,
+ * count of successful REST endpoint calls, whether a walk stopped before it
+ * covered the window, and error message if any.
  */
-export const reconcileWindow = async (commonRequestData, timePeriod, repoMeta) => {
+export const reconcileWindow = async (
+    commonRequestData,
+    timePeriod,
+    repoMeta,
+    { budgetMs = RECONCILE_BUDGET_MS, progress = false } = {},
+) => {
+    const budget = {
+        deadline: Date.now() + budgetMs,
+        truncated: false,
+        progress,
+    };
     const [issuesResult, pullsResult] = await Promise.allSettled([
-        getClosedIssuesInWindow(commonRequestData, timePeriod),
-        getPullsInWindow(commonRequestData, timePeriod),
+        getClosedIssuesInWindow(commonRequestData, timePeriod, { budget }),
+        getPullsInWindow(commonRequestData, timePeriod, { budget }),
     ]);
     const closedIssues = issuesResult.status === 'fulfilled' ? issuesResult.value : [];
     const pulls = pullsResult.status === 'fulfilled' ? pullsResult.value : [];
@@ -165,6 +186,7 @@ export const reconcileWindow = async (commonRequestData, timePeriod, repoMeta) =
             closedIssues, pulls, repo: repoMeta, timePeriod,
         }),
         endpointsSucceeded,
+        truncated: budget.truncated,
         error,
     };
 };

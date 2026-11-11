@@ -80,9 +80,10 @@ Both tools also perform a **reconciliation** against the GitHub REST API
 for the requested window when `RECONCILE=true`. This recovers issue
 closures and PR open/merge events that were missed by the Events-API
 poller (the Events API only retains the 300 most recent public events).
-When the REST API is unavailable the tools emit a warning; if the window
-is also empty in the local collection they exit non-zero rather than
-producing an under-reported message.
+The reconciliation stops at a 3-minute budget and emits a warning when it
+cannot cover the whole window. When the REST API is unavailable the tools
+emit a warning; if the window is also empty in the local collection they
+exit non-zero rather than producing an under-reported message.
 
 Per-poll diagnostics are appended to `<date>-metadata.json` (one
 record per poll) so polling gaps can be analyzed after the fact.
@@ -146,7 +147,19 @@ same day is safe and idempotent.
 An Events API page request that fails with a transient error is retried
 up to three times with exponential backoff before the poll fails. A rate
 limit response is not retried and reports when the limit resets or how
-long to wait. GitHub API requests time out after 30 seconds.
+long to wait. GitHub API requests time out after 30 seconds by default.
+A gap reconciliation request can time out sooner when the remaining
+budget is smaller than 30 seconds.
+
+When a poll gap is detected, `github-poll` backfills the gap from the
+GitHub REST API within a 3-minute budget. Each page is logged. The
+backfill stops with a warning when the budget is spent, and the collected
+events are still committed. A slow reconciliation thus does not lose the
+poll batch. A failed backfill is retried on the next poll. The metadata
+records `backfillTruncated: true` for a backfill that stopped at the
+budget or the 30-page limit. The poll does not retry a truncated backfill
+unless the reconciliation also failed, because the REST walks always
+restart from the newest page.
 
 #### Metadata fields
 
@@ -165,7 +178,9 @@ on the next poll.)
 | `rateLimitReset`     | ISO 8601 timestamp when the rate limit resets                         |
 | `oldestEventAt`      | `created_at` of the oldest event returned by this poll                |
 | `newestEventAt`      | `created_at` of the newest event returned by this poll                |
-| `gapSuspected`       | `true` if no successful poll for >90 min or event window gap detected |
+| `gapSuspected`       | `true` if no successful backfill for >90 min or window gap detected   |
+| `backfillTruncated`  | `true` if a gap backfill stopped early (time budget or page limit)    |
+| `backfillError`      | Reconciliation error message if the backfill failed, otherwise `null` |
 | `error`              | Error message if the poll failed, otherwise `null`                    |
 
 ### Print stats in console
@@ -211,6 +226,9 @@ entries load a `.env` file from the working directory if one exists.
 | `SINCE`           | `stats`, `publish`                       | Lower bound of the time window (ISO 8601). All stored events are used if omitted.                                                                                                |
 | `UNTIL`           | `stats`, `publish`                       | Upper bound of the time window (ISO 8601). Defaults to now if omitted.                                                                                                           |
 | `RECONCILE`       | —                                        | Set to `true` to back-fill missing issue and PR events from the GitHub REST API during `stats`/`publish`. Commit activity is read from the REST API. Disabled by default.        |
+
+`RECONCILE` reconciliation stops at a 3-minute budget. When the budget is
+spent, the tools warn that the report may under-report.
 
 ### Publishing variables
 
