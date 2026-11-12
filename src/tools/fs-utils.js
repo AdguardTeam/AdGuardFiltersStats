@@ -19,6 +19,7 @@ import { chain } from 'stream-chain';
 import { parser } from 'stream-json/jsonl/Parser';
 import { reduceStream } from './stream-utils';
 import {
+    getActivityKey,
     isCreatedSince,
     isCreatedUntil,
     sortEventsByDate,
@@ -289,8 +290,32 @@ const appendMetadataRecord = async (filePath, record) => {
 };
 
 /**
+ * Read the activity keys already stored in one date-aligned JSONL file.
+ *
+ * A retried backfill can cover events that the previous poll already stored
+ * as live Events-API events. Their ids differ from the synthetic ids, so the
+ * id-based dedupe cannot collapse them; the activity key can.
+ *
+ * @param {string} filePath Path to the collection file.
+ *
+ * @returns {Promise<Set<string>>} Activity keys already stored in the file.
+ */
+const readStoredActivityKeys = async (filePath) => {
+    if (!(await pathExists(filePath))) {
+        return new Set();
+    }
+    const stored = await getEventsFromFile(filePath, {
+        since: '1970-01-01T00:00:00Z',
+        until: '9999-12-31T23:59:59Z',
+    });
+    return new Set(stored.map(getActivityKey).filter(Boolean));
+};
+
+/**
  * Append synthetic events to their date-aligned JSONL files and run
- * dedupe so the existing id-based dedupe collapses repeats.
+ * dedupe so the existing id-based dedupe collapses repeats. A synthetic
+ * event whose activity is already stored as a live event is skipped, so a
+ * retried backfill does not double-count one closure or pull request.
  *
  * @param {string} collectionPath Path to the collection root.
  * @param {Array<object>} events Synthetic events with `id` and `created_at`.
@@ -301,14 +326,16 @@ const mergeSyntheticEventsIntoCollection = async (collectionPath, events) => {
     }
     await mkdir(collectionPath, { recursive: true });
     const sorted = sortEventsByDate(events);
-    await Promise.all(Object.keys(sorted).map((date) => writeEventsToFile(
-        `${collectionPath}/${date}${COLLECTION_FILE_EXTENSION}`,
-        sorted[date],
-        'a',
-    )));
-    await Promise.all(Object.keys(sorted).map((date) => removeDupesFromFile(
-        `${collectionPath}/${date}${COLLECTION_FILE_EXTENSION}`,
-    )));
+    await Promise.all(Object.keys(sorted).map(async (date) => {
+        const filePath = `${collectionPath}/${date}${COLLECTION_FILE_EXTENSION}`;
+        const storedKeys = await readStoredActivityKeys(filePath);
+        const fresh = sorted[date].filter((event) => {
+            const key = getActivityKey(event);
+            return !key || !storedKeys.has(key);
+        });
+        await writeEventsToFile(filePath, fresh, 'a');
+        await removeDupesFromFile(filePath);
+    }));
 };
 
 export {
