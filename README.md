@@ -81,9 +81,10 @@ for the requested window when `RECONCILE=true`. This recovers issue
 closures and PR open/merge events that were missed by the Events-API
 poller (the Events API only retains the 300 most recent public events).
 The reconciliation stops at a 3-minute budget and emits a warning when it
-cannot cover the whole window. When the REST API is unavailable the tools
-emit a warning; if the window is also empty in the local collection they
-exit non-zero rather than producing an under-reported message.
+cannot cover the whole window. When the REST API is unavailable or the
+reconciliation is truncated, the tools emit a warning; if the window is
+also empty in the local collection they exit non-zero rather than
+producing an under-reported message.
 
 Per-poll diagnostics are appended to `<date>-metadata.json` (one
 record per poll) so polling gaps can be analyzed after the fact.
@@ -155,11 +156,17 @@ When a poll gap is detected, `github-poll` backfills the gap from the
 GitHub REST API within a 3-minute budget. Each page is logged. The
 backfill stops with a warning when the budget is spent, and the collected
 events are still committed. A slow reconciliation thus does not lose the
-poll batch. A failed backfill is retried on the next poll. The metadata
-records `backfillTruncated: true` for a backfill that stopped at the
-budget or the 30-page limit. The poll does not retry a truncated backfill
-unless the reconciliation also failed, because the REST walks always
-restart from the newest page.
+poll batch. A failed backfill is retried on the next poll, and a backfill
+that stops at the time budget is retried too: the next poll measures the
+gap from the previous successful poll. The metadata records
+`backfillTruncated: true` for a backfill that stopped at the budget or the
+30-page limit, and `backfillBudgetExceeded: true` for the budget case. A
+page-limit truncation is not retried, because the REST walks always
+restart from the newest page and a retry cannot reach the un-walked tail.
+
+A retried backfill can overlap events that are already stored. Synthetic
+events whose activity key is already present in the collection are
+skipped, so a retry does not count one closure or pull request twice.
 
 #### Metadata fields
 
@@ -167,21 +174,22 @@ The `YYYY-MM-DD-metadata.json` sidecar contains a JSON **array** of records, one
 poll run. (Legacy files written as a single object are automatically migrated to an array
 on the next poll.)
 
-| Field                | Description                                                           |
-| -------------------- | --------------------------------------------------------------------- |
-| `timestamp`          | ISO 8601 time when this poll ran                                      |
-| `totalEvents`        | Events fetched from GitHub API                                        |
-| `eventsInFile`       | Unique events written after deduplication                             |
-| `pagesCollected`     | Number of API pages processed                                         |
-| `rateLimitReached`   | Whether the API rate limit was hit                                    |
-| `rateLimitRemaining` | Remaining API requests at poll time                                   |
-| `rateLimitReset`     | ISO 8601 timestamp when the rate limit resets                         |
-| `oldestEventAt`      | `created_at` of the oldest event returned by this poll                |
-| `newestEventAt`      | `created_at` of the newest event returned by this poll                |
-| `gapSuspected`       | `true` if no successful backfill for >90 min or window gap detected   |
-| `backfillTruncated`  | `true` if a gap backfill stopped early (time budget or page limit)    |
-| `backfillError`      | Reconciliation error message if the backfill failed, otherwise `null` |
-| `error`              | Error message if the poll failed, otherwise `null`                    |
+| Field                    | Description                                                                                                                      |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `timestamp`              | ISO 8601 time when this poll ran                                                                                                 |
+| `totalEvents`            | Events fetched from GitHub API                                                                                                   |
+| `eventsInFile`           | Unique events written after deduplication                                                                                        |
+| `pagesCollected`         | Number of API pages processed                                                                                                    |
+| `rateLimitReached`       | Whether the API rate limit was hit                                                                                               |
+| `rateLimitRemaining`     | Remaining API requests at poll time                                                                                              |
+| `rateLimitReset`         | ISO 8601 timestamp when the rate limit resets                                                                                    |
+| `oldestEventAt`          | `created_at` of the oldest event returned by this poll                                                                           |
+| `newestEventAt`          | `created_at` of the newest event returned by this poll                                                                           |
+| `gapSuspected`           | `true` if no successful poll for >90 min (a failed or budget-stopped backfill does not count) or an event-window gap is detected |
+| `backfillTruncated`      | `true` if a gap backfill stopped early (time budget or page limit)                                                               |
+| `backfillBudgetExceeded` | `true` if the time budget, rather than the page limit, stopped a backfill                                                        |
+| `backfillError`          | Reconciliation error message if the backfill failed, otherwise `null`                                                            |
+| `error`                  | Error message if the poll failed, otherwise `null`                                                                               |
 
 ### Print stats in console
 
