@@ -153,9 +153,10 @@ export const buildSyntheticEvents = ({
  * @param {boolean} [options.progress] Log each page of a long-running poll step.
  *
  * @returns {Promise<{injectedEvents: Array<object>, endpointsSucceeded: number,
- * truncated: boolean, error: string|null}>} Object with synthetic events array,
- * count of successful REST endpoint calls, whether a walk stopped before it
- * covered the window, and error message if any.
+ * truncated: boolean, budgetExceeded: boolean, error: string|null}>} Object with
+ * synthetic events array, count of successful REST endpoint calls, whether a walk
+ * stopped before it covered the window, whether the time budget (rather than the
+ * page limit) stopped a walk, and error message if any.
  */
 export const reconcileWindow = async (
     commonRequestData,
@@ -166,6 +167,7 @@ export const reconcileWindow = async (
     const budget = {
         deadline: Date.now() + budgetMs,
         truncated: false,
+        budgetExceeded: false,
         progress,
     };
     const [issuesResult, pullsResult] = await Promise.allSettled([
@@ -187,6 +189,7 @@ export const reconcileWindow = async (
         }),
         endpointsSucceeded,
         truncated: budget.truncated,
+        budgetExceeded: budget.budgetExceeded,
         error,
     };
 };

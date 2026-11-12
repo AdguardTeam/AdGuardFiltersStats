@@ -36,8 +36,13 @@ export const MILLISECONDS_IN_DAY = 1000 * 60 * 60 * 24;
 export const EVENT_EXPIRATION_DAYS = 30;
 
 /**
- * Minimum time (ms) between two polls with successful backfills before a gap
- * is suspected.
+ * Minimum time (ms) since the last successful poll before a gap is suspected.
+ *
+ * A poll whose backfill failed or hit the time budget does not count as
+ * successful, so the next poll measures the gap from the previous successful
+ * poll. A backfill truncated by the 30-page limit still counts, because every
+ * walk starts from the newest page and a retry could not reach the un-walked
+ * tail.
  *
  * 90 minutes — exceeds the recommended 60-min poll cadence but stays below
  * the point where the GitHub Events API (300-event cap) would start losing data.

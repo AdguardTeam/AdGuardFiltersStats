@@ -66,19 +66,20 @@ describe('REST window walks — time budget', () => {
     });
 
     it('does not request an issues page when the budget is already spent', async () => {
-        const budget = { deadline: Date.now() - 1, truncated: false };
+        const budget = { deadline: Date.now() - 1, truncated: false, budgetExceeded: false };
 
         const issues = await getClosedIssuesInWindow(commonRequestData, window, { budget });
 
         expect(issues).toEqual([]);
         expect(budget.truncated).toBe(true);
+        expect(budget.budgetExceeded).toBe(true);
         expect(mockRequest).not.toHaveBeenCalled();
     });
 
     it('stops the issues walk after the page that uses up the budget', async () => {
         const base = Date.now();
         const budget = {
-            deadline: base + 5000, truncated: false, progress: true,
+            deadline: base + 5000, truncated: false, budgetExceeded: false, progress: true,
         };
         jest.spyOn(Date, 'now')
             .mockReturnValueOnce(base)
@@ -89,6 +90,7 @@ describe('REST window walks — time budget', () => {
 
         expect(issues.map((issue) => issue.number)).toEqual([100]);
         expect(budget.truncated).toBe(true);
+        expect(budget.budgetExceeded).toBe(true);
         expect(mockRequest).toHaveBeenCalledTimes(1);
         expect(logger.log).toHaveBeenCalledWith(
             expect.stringContaining('getClosedIssuesInWindow: fetching page 1'),
@@ -97,7 +99,7 @@ describe('REST window walks — time budget', () => {
 
     it('does not log each page when progress is off', async () => {
         const base = Date.now();
-        const budget = { deadline: base + 5000, truncated: false };
+        const budget = { deadline: base + 5000, truncated: false, budgetExceeded: false };
         jest.spyOn(Date, 'now')
             .mockReturnValueOnce(base)
             .mockReturnValue(base + 6000);
@@ -110,7 +112,7 @@ describe('REST window walks — time budget', () => {
 
     it('keeps the issues collected before a budget-capped request times out', async () => {
         const base = Date.now();
-        const budget = { deadline: base + 5000, truncated: false };
+        const budget = { deadline: base + 5000, truncated: false, budgetExceeded: false };
         jest.spyOn(Date, 'now')
             .mockReturnValueOnce(base)
             .mockReturnValueOnce(base + 2000)
@@ -126,12 +128,13 @@ describe('REST window walks — time budget', () => {
 
         expect(issues.map((issue) => issue.number)).toEqual([100]);
         expect(budget.truncated).toBe(true);
+        expect(budget.budgetExceeded).toBe(true);
         expect(mockRequest).toHaveBeenCalledTimes(2);
     });
 
     it('caps the request timeout by the remaining budget', async () => {
         const base = Date.now();
-        const budget = { deadline: base + 5000, truncated: false };
+        const budget = { deadline: base + 5000, truncated: false, budgetExceeded: false };
         jest.spyOn(Date, 'now')
             .mockReturnValueOnce(base)
             .mockReturnValue(base + 6000);
@@ -144,18 +147,19 @@ describe('REST window walks — time budget', () => {
     });
 
     it('propagates a 30 s timeout that the budget did not cap', async () => {
-        const budget = { deadline: Date.now() + 60 * 1000, truncated: false };
+        const budget = { deadline: Date.now() + 60 * 1000, truncated: false, budgetExceeded: false };
         jest.spyOn(AbortSignal, 'timeout').mockReturnValue(AbortSignal.abort());
         mockRequest.mockRejectedValueOnce(new Error('The user aborted a request.'));
 
         await expect(getClosedIssuesInWindow(commonRequestData, window, { budget }))
             .rejects.toThrow('Request timed out after 30000 ms');
         expect(budget.truncated).toBe(false);
+        expect(budget.budgetExceeded).toBe(false);
     });
 
     it('propagates a REST error that lands after the deadline', async () => {
         const base = Date.now();
-        const budget = { deadline: base + 5000, truncated: false };
+        const budget = { deadline: base + 5000, truncated: false, budgetExceeded: false };
         jest.spyOn(Date, 'now')
             .mockReturnValueOnce(base)
             .mockReturnValue(base + 6000);
@@ -164,32 +168,35 @@ describe('REST window walks — time budget', () => {
         await expect(getClosedIssuesInWindow(commonRequestData, window, { budget }))
             .rejects.toThrow('Not Found');
         expect(budget.truncated).toBe(false);
+        expect(budget.budgetExceeded).toBe(false);
     });
 
     it('marks the walk truncated when the page safety limit is reached', async () => {
-        const budget = { deadline: Date.now() + 60 * 1000, truncated: false };
+        const budget = { deadline: Date.now() + 60 * 1000, truncated: false, budgetExceeded: false };
         mockRequest.mockResolvedValue(buildIssuePage(100));
 
         const issues = await getClosedIssuesInWindow(commonRequestData, window, { budget });
 
         expect(issues).toHaveLength(30);
         expect(budget.truncated).toBe(true);
+        expect(budget.budgetExceeded).toBe(false);
         expect(mockRequest).toHaveBeenCalledTimes(30);
     });
 
     it('does not request a pulls page when the budget is already spent', async () => {
-        const budget = { deadline: Date.now() - 1, truncated: false };
+        const budget = { deadline: Date.now() - 1, truncated: false, budgetExceeded: false };
 
         const pulls = await getPullsInWindow(commonRequestData, window, { budget });
 
         expect(pulls).toEqual([]);
         expect(budget.truncated).toBe(true);
+        expect(budget.budgetExceeded).toBe(true);
         expect(mockRequest).not.toHaveBeenCalled();
     });
 
     it('stops the pulls walk after the page that uses up the budget', async () => {
         const base = Date.now();
-        const budget = { deadline: base + 5000, truncated: false };
+        const budget = { deadline: base + 5000, truncated: false, budgetExceeded: false };
         jest.spyOn(Date, 'now')
             .mockReturnValueOnce(base)
             .mockReturnValue(base + 6000);
@@ -199,6 +206,19 @@ describe('REST window walks — time budget', () => {
 
         expect(pulls.map((pull) => pull.number)).toEqual([200]);
         expect(budget.truncated).toBe(true);
+        expect(budget.budgetExceeded).toBe(true);
         expect(mockRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it('marks the pulls walk truncated when the page safety limit is reached', async () => {
+        const budget = { deadline: Date.now() + 60 * 1000, truncated: false, budgetExceeded: false };
+        mockRequest.mockResolvedValue(buildPullPage(200));
+
+        const pulls = await getPullsInWindow(commonRequestData, window, { budget });
+
+        expect(pulls).toHaveLength(30);
+        expect(budget.truncated).toBe(true);
+        expect(budget.budgetExceeded).toBe(false);
+        expect(mockRequest).toHaveBeenCalledTimes(30);
     });
 });

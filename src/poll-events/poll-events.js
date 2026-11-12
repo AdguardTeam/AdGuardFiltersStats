@@ -45,15 +45,19 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
         const today = format(new Date(), 'yyyy-MM-dd');
         const metadataPath = path.join(collectionPath, `${today}-metadata.json`);
         const prevRecords = await readMetadataRecords(metadataPath);
-        // A failed backfill must not move the window forward: the next poll
-        // retries the gap from the last successful poll.
+        // A failed backfill and a backfill that ran out of budget must not
+        // move the window forward: the next poll retries the gap from the
+        // last successful poll. A page-limit truncation still counts as
+        // successful because every walk starts from the newest page, so a
+        // retry cannot reach the un-walked tail.
         const lastSuccessful = prevRecords
-            .filter((r) => !r.error && !r.backfillError)
+            .filter((r) => !r.error && !r.backfillError && !r.backfillBudgetExceeded)
             .at(-1);
 
         let gapSuspected = false;
         let gapWindowSince = null;
         let backfillTruncated = false;
+        let backfillBudgetExceeded = false;
         let backfillError = null;
         if (lastSuccessful) {
             const msSinceLast = Date.now() - new Date(lastSuccessful.timestamp).getTime();
@@ -79,6 +83,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
                 injectedEvents,
                 error: reconciliationError,
                 truncated,
+                budgetExceeded,
             } = await reconcileWindow(
                 commonRequestData,
                 gapWindow,
@@ -86,14 +91,21 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
                 { progress: true },
             );
             backfillTruncated = truncated;
+            backfillBudgetExceeded = budgetExceeded;
             backfillError = reconciliationError;
             if (backfillError) {
                 logger.warn(`⚠️ Gap detected but backfill failed: ${backfillError}`);
             } else if (injectedEvents.length > 0) {
                 await mergeSyntheticEventsIntoCollection(collectionPath, injectedEvents);
             }
-            if (backfillTruncated) {
-                logger.warn('⚠️ Gap backfill stopped before it covered the window; some events may be missing.');
+            if (backfillBudgetExceeded) {
+                logger.warn(
+                    '::warning::Gap backfill stopped at the time budget; the next poll retries the window.',
+                );
+            } else if (backfillTruncated) {
+                logger.warn(
+                    '::warning::Gap backfill stopped at the pagination limit; some events may be missing.',
+                );
             }
         }
 
@@ -110,6 +122,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
             newestEventAt,
             gapSuspected,
             backfillTruncated,
+            backfillBudgetExceeded,
             backfillError,
             error: null,
             collectionPath,
@@ -143,6 +156,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
                     newestEventAt: null,
                     gapSuspected: false,
                     backfillTruncated: false,
+                    backfillBudgetExceeded: false,
                     backfillError: null,
                     error: error.message,
                     collectionPath,

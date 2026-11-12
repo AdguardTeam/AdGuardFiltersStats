@@ -18,6 +18,8 @@ import {
     getGithubEvents,
     getPullsInWindow,
 } from '../../src/tools/gh-utils';
+// eslint-disable-next-line import/first
+import { logger } from '../../src/tools/logger';
 
 const makeEvent = (isoTime) => ({
     id: `evt-${isoTime}`,
@@ -151,6 +153,45 @@ describe('pollEvents — gap detection', () => {
         expect(records[1].gapSuspected).toBe(true);
     });
 
+    it('does not backfill an equal-bounds window', async () => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const eventTime = new Date().toISOString();
+        const oldRecord = {
+            timestamp: subMinutes(new Date(), 120).toISOString(),
+            totalEvents: 5,
+            pagesCollected: 1,
+            eventsInFile: 5,
+            rateLimitRemaining: 4995,
+            rateLimitReached: false,
+            rateLimitReset: null,
+            oldestEventAt: subMinutes(new Date(), 130).toISOString(),
+            // The current batch starts exactly at the previous newest event:
+            // the boundary event is already stored, so there is no missing
+            // interval and an empty window must not be reconciled.
+            newestEventAt: eventTime,
+            gapSuspected: false,
+            error: null,
+            collectionPath: dir,
+            repo: 'a/b',
+        };
+        await writeFile(
+            path.join(dir, `${today}-metadata.json`),
+            JSON.stringify([oldRecord]),
+        );
+        getGithubEvents.mockResolvedValueOnce(makeGhResponse(eventTime));
+        const callsBefore = getClosedIssuesInWindow.mock.calls.length;
+
+        await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+        const records = JSON.parse(
+            await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
+        );
+        expect(records[1].gapSuspected).toBe(true);
+        expect(records[1].backfillTruncated).toBe(false);
+        expect(records[1].backfillBudgetExceeded).toBe(false);
+        expect(getClosedIssuesInWindow.mock.calls.length).toBe(callsBefore);
+    });
+
     it('records backfillTruncated=true when the backfill stops at the time budget', async () => {
         const today = format(new Date(), 'yyyy-MM-dd');
         const twoHoursAgo = subMinutes(new Date(), 120).toISOString();
@@ -174,22 +215,34 @@ describe('pollEvents — gap detection', () => {
             JSON.stringify([oldRecord]),
         );
         getGithubEvents.mockResolvedValueOnce(makeGhResponse(new Date().toISOString()));
+        let capturedBudget;
         getClosedIssuesInWindow.mockImplementationOnce(async (requestData, period, { budget }) => {
+            capturedBudget = budget;
             // eslint-disable-next-line no-param-reassign -- the real walk marks the shared budget
             budget.truncated = true;
+            // eslint-disable-next-line no-param-reassign -- the real walk marks the shared budget
+            budget.budgetExceeded = true;
             return [];
         });
+        const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
 
-        await pollEvents(dir, { owner: 'a', repo: 'b' });
+        try {
+            await pollEvents(dir, { owner: 'a', repo: 'b' });
 
-        const records = JSON.parse(
-            await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
-        );
-        expect(records[1].gapSuspected).toBe(true);
-        expect(records[1].backfillTruncated).toBe(true);
+            const records = JSON.parse(
+                await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
+            );
+            expect(records[1].gapSuspected).toBe(true);
+            expect(records[1].backfillTruncated).toBe(true);
+            expect(records[1].backfillBudgetExceeded).toBe(true);
+            expect(capturedBudget.progress).toBe(true);
+            expect(warn).toHaveBeenCalledWith(expect.stringContaining('time budget'));
+        } finally {
+            warn.mockRestore();
+        }
     });
 
-    it('counts a truncated backfill as the last successful poll', async () => {
+    it('counts a page-limit-truncated backfill as the last successful poll', async () => {
         const today = format(new Date(), 'yyyy-MM-dd');
         const completeRecord = {
             timestamp: subMinutes(new Date(), 180).toISOString(),
@@ -203,6 +256,7 @@ describe('pollEvents — gap detection', () => {
             newestEventAt: subMinutes(new Date(), 181).toISOString(),
             gapSuspected: false,
             backfillTruncated: false,
+            backfillBudgetExceeded: false,
             error: null,
             collectionPath: dir,
             repo: 'a/b',
@@ -213,6 +267,7 @@ describe('pollEvents — gap detection', () => {
             newestEventAt: subMinutes(new Date(), 5).toISOString(),
             gapSuspected: true,
             backfillTruncated: true,
+            backfillBudgetExceeded: false,
         };
         await writeFile(
             path.join(dir, `${today}-metadata.json`),
@@ -225,9 +280,58 @@ describe('pollEvents — gap detection', () => {
         const records = JSON.parse(
             await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
         );
-        // A truncated backfill is recorded, and its batch is the newest data:
-        // the next poll starts from it instead of retrying the same window.
+        // A page-limit truncation is recorded, and its batch is the newest
+        // data: the next poll starts from it instead of retrying the same
+        // window, because every walk restarts from the newest page.
         expect(records[2].gapSuspected).toBe(false);
+    });
+
+    it('retries a budget-stopped backfill from the last successful poll', async () => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const completeRecord = {
+            timestamp: subMinutes(new Date(), 180).toISOString(),
+            totalEvents: 5,
+            pagesCollected: 1,
+            eventsInFile: 5,
+            rateLimitRemaining: 4995,
+            rateLimitReached: false,
+            rateLimitReset: null,
+            oldestEventAt: subMinutes(new Date(), 190).toISOString(),
+            newestEventAt: subMinutes(new Date(), 181).toISOString(),
+            gapSuspected: false,
+            backfillTruncated: false,
+            backfillBudgetExceeded: false,
+            error: null,
+            collectionPath: dir,
+            repo: 'a/b',
+        };
+        const budgetStoppedRecord = {
+            ...completeRecord,
+            timestamp: subMinutes(new Date(), 10).toISOString(),
+            newestEventAt: subMinutes(new Date(), 5).toISOString(),
+            gapSuspected: true,
+            backfillTruncated: true,
+            backfillBudgetExceeded: true,
+        };
+        await writeFile(
+            path.join(dir, `${today}-metadata.json`),
+            JSON.stringify([completeRecord, budgetStoppedRecord]),
+        );
+        getGithubEvents.mockResolvedValueOnce(makeGhResponse(new Date().toISOString()));
+
+        await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+        const records = JSON.parse(
+            await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
+        );
+        // The budget stop does not move the window forward: the next poll
+        // retries from the last successful poll's newest event.
+        expect(records[2].gapSuspected).toBe(true);
+        expect(getClosedIssuesInWindow).toHaveBeenLastCalledWith(
+            { owner: 'a', repo: 'b' },
+            { since: completeRecord.newestEventAt, until: expect.any(String) },
+            expect.any(Object),
+        );
     });
 
     it('skips a backfill when the event batches overlap', async () => {

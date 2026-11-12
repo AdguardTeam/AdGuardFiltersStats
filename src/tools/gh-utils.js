@@ -38,8 +38,9 @@ const octokit = new Octokit({ auth: GITHUB_TOKEN });
  *
  * @returns {Promise<object>} Octokit response.
  *
- * @throws {Error & {status?: number}} The request failure. A request that the
- * timeout aborted fails with a message that names the timeout.
+ * @throws {Error & {status?: number, timedOut?: boolean}} The request failure.
+ * A request that the timeout aborted sets `timedOut` and fails with a message
+ * that names the timeout.
  */
 const requestWithTimeout = async (endpoint, params = {}, timeoutMs = REQUEST_TIMEOUT_MS) => {
     const signal = AbortSignal.timeout(timeoutMs);
@@ -303,6 +304,8 @@ const inWindow = (iso, interval) => {
  * @typedef {object} WalkBudget
  * @property {number} deadline Epoch milliseconds after which no page is requested.
  * @property {boolean} truncated `true` once a walk stops before the window is covered.
+ * @property {boolean} [budgetExceeded] `true` once the time budget, rather than
+ * the page limit, stopped a walk.
  * @property {boolean} [progress] `true` to log each page to stdout.
  */
 
@@ -326,6 +329,8 @@ const fetchPageWithinBudget = async (endpoint, params, budget, label, page) => {
 
     if (budget && remainingMs <= 0) {
         logger.warn(`⚠️ ${label}: time budget reached before page ${page}, returning a partial list`);
+        // eslint-disable-next-line no-param-reassign -- the budget is the shared coordination object
+        budget.budgetExceeded = true;
         return null;
     }
 
@@ -342,6 +347,8 @@ const fetchPageWithinBudget = async (endpoint, params, budget, label, page) => {
         // API error that lands after the deadline must keep its own message.
         if (budgetCapped && error.timedOut) {
             logger.warn(`⚠️ ${label}: time budget reached on page ${page}, returning a partial list`);
+            // eslint-disable-next-line no-param-reassign -- the budget is the shared coordination object
+            budget.budgetExceeded = true;
             return null;
         }
         throw error;
