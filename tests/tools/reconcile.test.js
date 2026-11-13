@@ -143,7 +143,9 @@ describe('mergeSyntheticEventsIntoCollection', () => {
             actor: { login: 'zloyden' },
             payload: {
                 action: 'closed',
-                issue: { id: 4001, number: 42, labels: [] },
+                issue: {
+                    id: 4001, number: 42, closed_at: '2026-04-21T06:31:14Z', labels: [],
+                },
             },
         };
         await writeFile(
@@ -158,7 +160,9 @@ describe('mergeSyntheticEventsIntoCollection', () => {
             actor: { login: 'zloyden' },
             payload: {
                 action: 'closed',
-                issue: { id: 4001, number: 42, labels: [] },
+                issue: {
+                    id: 4001, number: 42, closed_at: '2026-04-21T06:31:14Z', labels: [],
+                },
             },
         };
 
@@ -167,6 +171,51 @@ describe('mergeSyntheticEventsIntoCollection', () => {
         const lines = (await readFile(path.join(dir, '2026-04-21.jsonl'), 'utf8'))
             .trim().split('\n').map(JSON.parse);
         expect(lines.map((e) => e.id)).toEqual(['live-close-4001']);
+    });
+
+    it('keeps the second closure of an issue that was reopened on the same day', async () => {
+        const dir = await mkdtemp(path.join(tmpdir(), 'merge-reclose-'));
+        // First closure, already stored as a live event.
+        const liveClose = {
+            id: 'live-close-4001',
+            type: 'IssuesEvent',
+            created_at: '2026-04-21T06:31:14Z',
+            actor: { login: 'zloyden' },
+            payload: {
+                action: 'closed',
+                issue: {
+                    id: 4001, number: 42, closed_at: '2026-04-21T06:31:14Z', labels: [],
+                },
+            },
+        };
+        await writeFile(
+            path.join(dir, '2026-04-21.jsonl'),
+            `${JSON.stringify(liveClose)}\n`,
+        );
+
+        // The issue was reopened and closed again, so the backfill returns a
+        // second closure of the same issue on the same day.
+        const secondClose = {
+            id: 'synthetic-issue-closed-4001-1745258400000',
+            type: 'IssuesEvent',
+            created_at: '2026-04-21T18:00:00Z',
+            actor: { login: 'zloyden' },
+            payload: {
+                action: 'closed',
+                issue: {
+                    id: 4001, number: 42, closed_at: '2026-04-21T18:00:00Z', labels: [],
+                },
+            },
+        };
+
+        await mergeSyntheticEventsIntoCollection(dir, [secondClose]);
+
+        const lines = (await readFile(path.join(dir, '2026-04-21.jsonl'), 'utf8'))
+            .trim().split('\n').map(JSON.parse);
+        expect(lines.map((e) => e.id)).toEqual([
+            'live-close-4001',
+            'synthetic-issue-closed-4001-1745258400000',
+        ]);
     });
 });
 

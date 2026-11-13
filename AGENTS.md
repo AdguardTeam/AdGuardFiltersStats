@@ -301,7 +301,9 @@ conventions not covered by the linter.
   page-limit truncation MUST NOT be retried, because the walks always
   restart from the newest page. Because a retried walk can overlap stored
   events, merging synthetic events MUST skip an event whose activity key
-  is already stored.
+  is already stored. The activity key MUST identify one occurrence, not
+  only the issue or pull request: an issue that is reopened and closed
+  again counts as two closures.
 - **Logging**: Use `console.log` for progress, `console.warn` for
   recoverable issues (rate-limit warnings, missing optional data), and
   `console.error` for fatal errors. Disable the `no-console` ESLint rule

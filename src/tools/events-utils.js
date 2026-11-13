@@ -276,6 +276,11 @@ const eventsToActivityByTime = (contributor) => {
  * them. The key is built from the underlying issue or pull request and the
  * action that counts as activity.
  *
+ * An issue can be closed more than once: reopened and closed again. The close
+ * time tells those closures apart, so the key keeps the second closure instead
+ * of collapsing it into the first one. A payload without `closed_at` falls
+ * back to the issue-only key.
+ *
  * @param {object} event GitHub event object.
  *
  * @returns {string|null} Activity key, or null when the event is not recoverable activity.
@@ -284,7 +289,11 @@ const getActivityKey = (event) => {
     const { type, payload } = event;
     if (type === EVENT_TYPES.ISSUES_EVENT && payload.action === ACTION_NAMES.CLOSED) {
         const issueId = payload.issue?.id;
-        return issueId ? `issue-${issueId}-closed` : null;
+        if (!issueId) {
+            return null;
+        }
+        const closedAt = payload.issue.closed_at;
+        return closedAt ? `issue-${issueId}-closed-${closedAt}` : `issue-${issueId}-closed`;
     }
     if (type === EVENT_TYPES.PULL_REQUEST_EVENT) {
         const pullId = payload.pull_request?.id;
