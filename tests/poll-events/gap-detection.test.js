@@ -1,4 +1,6 @@
-import { mkdtemp, writeFile, readFile } from 'fs/promises';
+import {
+    mkdtemp, writeFile, readFile, readdir,
+} from 'fs/promises';
 import { tmpdir } from 'os';
 import path from 'path';
 import { format, subMinutes } from 'date-fns';
@@ -40,6 +42,16 @@ const makeGhResponse = (eventTime) => ({
         timestamp: new Date().toISOString(),
     },
 });
+
+const readStoredEvents = async (dir) => {
+    const files = (await readdir(dir)).filter((name) => name.endsWith('.jsonl'));
+    const contents = await Promise.all(
+        files.map((name) => readFile(path.join(dir, name), 'utf8')),
+    );
+    return contents
+        .flatMap((raw) => raw.trim().split('\n').filter(Boolean))
+        .map((line) => JSON.parse(line));
+};
 
 describe('pollEvents — gap detection', () => {
     let dir;
@@ -465,6 +477,132 @@ describe('pollEvents — gap detection', () => {
 
         // The failed backfill must not hide the gap on the next poll, and the
         // retried window must start at the last successful poll.
+        getGithubEvents.mockResolvedValueOnce(makeGhResponse(new Date().toISOString()));
+        const callsBefore = getClosedIssuesInWindow.mock.calls.length;
+        await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+        const secondRecords = JSON.parse(
+            await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
+        );
+        expect(secondRecords[2].gapSuspected).toBe(true);
+        expect(getClosedIssuesInWindow.mock.calls.length).toBe(callsBefore + 1);
+        expect(getClosedIssuesInWindow.mock.calls.at(-1)[1]).toEqual({
+            since: oldRecord.newestEventAt,
+            until: expect.any(String),
+        });
+    });
+
+    it('stores the issues walk events when the pulls walk fails and retries the window', async () => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const oldRecord = {
+            timestamp: subMinutes(new Date(), 120).toISOString(),
+            totalEvents: 5,
+            pagesCollected: 1,
+            eventsInFile: 5,
+            rateLimitRemaining: 4995,
+            rateLimitReached: false,
+            rateLimitReset: null,
+            oldestEventAt: subMinutes(new Date(), 130).toISOString(),
+            newestEventAt: subMinutes(new Date(), 121).toISOString(),
+            gapSuspected: false,
+            error: null,
+            collectionPath: dir,
+            repo: 'a/b',
+        };
+        await writeFile(
+            path.join(dir, `${today}-metadata.json`),
+            JSON.stringify([oldRecord]),
+        );
+        const closedAt = subMinutes(new Date(), 60).toISOString();
+        const closedIssue = {
+            id: 4001,
+            number: 42,
+            closed_at: closedAt,
+            closed_by: { id: 7, login: 'zloyden' },
+            labels: [],
+        };
+        getGithubEvents.mockResolvedValueOnce(makeGhResponse(new Date().toISOString()));
+        getClosedIssuesInWindow.mockResolvedValueOnce([closedIssue]);
+        getPullsInWindow.mockRejectedValueOnce(new Error('pulls rate limit'));
+
+        await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+        const firstRecords = JSON.parse(
+            await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
+        );
+        expect(firstRecords[1].backfillError).toContain('pulls rate limit');
+        const syntheticIssueId = `synthetic-issue-closed-4001-${new Date(closedAt).getTime()}`;
+        const firstStored = await readStoredEvents(dir);
+        expect(firstStored.filter((e) => e.id === syntheticIssueId)).toHaveLength(1);
+
+        // The failed pulls walk must not move the window forward, so the next
+        // poll retries the window from the last successful poll.
+        getGithubEvents.mockResolvedValueOnce(makeGhResponse(new Date().toISOString()));
+        getClosedIssuesInWindow.mockResolvedValueOnce([closedIssue]);
+        const callsBefore = getPullsInWindow.mock.calls.length;
+        await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+        const secondRecords = JSON.parse(
+            await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
+        );
+        expect(secondRecords[2].gapSuspected).toBe(true);
+        expect(getPullsInWindow.mock.calls.length).toBe(callsBefore + 1);
+        expect(getPullsInWindow.mock.calls.at(-1)[1]).toEqual({
+            since: oldRecord.newestEventAt,
+            until: expect.any(String),
+        });
+        // The retried walk returns the same closure, which stays stored once.
+        const secondStored = await readStoredEvents(dir);
+        expect(secondStored.filter((e) => e.id === syntheticIssueId)).toHaveLength(1);
+    });
+
+    it('stores the pulls walk events when the issues walk fails and retries the window', async () => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const oldRecord = {
+            timestamp: subMinutes(new Date(), 120).toISOString(),
+            totalEvents: 5,
+            pagesCollected: 1,
+            eventsInFile: 5,
+            rateLimitRemaining: 4995,
+            rateLimitReached: false,
+            rateLimitReset: null,
+            oldestEventAt: subMinutes(new Date(), 130).toISOString(),
+            newestEventAt: subMinutes(new Date(), 121).toISOString(),
+            gapSuspected: false,
+            error: null,
+            collectionPath: dir,
+            repo: 'a/b',
+        };
+        await writeFile(
+            path.join(dir, `${today}-metadata.json`),
+            JSON.stringify([oldRecord]),
+        );
+        const pull = {
+            id: 5001,
+            number: 300,
+            created_at: subMinutes(new Date(), 70).toISOString(),
+            merged_at: subMinutes(new Date(), 60).toISOString(),
+            user: { id: 9, login: 'user1' },
+        };
+        getGithubEvents.mockResolvedValueOnce(makeGhResponse(new Date().toISOString()));
+        getClosedIssuesInWindow.mockRejectedValueOnce(new Error('issues rate limit'));
+        getPullsInWindow.mockResolvedValueOnce([pull]);
+
+        await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+        const firstRecords = JSON.parse(
+            await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
+        );
+        expect(firstRecords[1].backfillError).toContain('issues rate limit');
+        const firstStored = await readStoredEvents(dir);
+        const storedIds = firstStored.map((e) => e.id);
+        expect(storedIds).toEqual(expect.arrayContaining([
+            'synthetic-pr-opened-5001',
+            'synthetic-pr-merged-5001',
+        ]));
+
+        // The failed issues walk must not move the window forward, so the next
+        // poll retries the window from the last successful poll.
         getGithubEvents.mockResolvedValueOnce(makeGhResponse(new Date().toISOString()));
         const callsBefore = getClosedIssuesInWindow.mock.calls.length;
         await pollEvents(dir, { owner: 'a', repo: 'b' });

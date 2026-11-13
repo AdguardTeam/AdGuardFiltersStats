@@ -26,6 +26,11 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 - `github-stats` and `github-publish` with `RECONCILE=true` now use the same
   3-minute budget and warn when reconciliation cannot cover the whole
   window.
+- `github-poll`, `github-stats`, and `github-publish` now keep the events
+  that a reconciliation walk recovers when the other walk fails.
+  `github-poll` still does not count the failed backfill as a successful
+  poll, so the next poll retries the window, and a repeated event is not
+  counted twice.
 
 ## 1.1.5
 
