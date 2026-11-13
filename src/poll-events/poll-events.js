@@ -100,11 +100,11 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
             }
             if (backfillBudgetExceeded) {
                 logger.warn(
-                    '::warning::Gap backfill stopped at the time budget; the next poll retries the window.',
+                    '::warning::Gap backfill stopped at the time budget. The next poll retries the window.',
                 );
             } else if (backfillTruncated) {
                 logger.warn(
-                    '::warning::Gap backfill stopped at the pagination limit; some events may be missing.',
+                    '::warning::Gap backfill stopped at the pagination limit. Some events may be missing.',
                 );
             }
         }

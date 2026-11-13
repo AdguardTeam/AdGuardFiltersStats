@@ -236,7 +236,53 @@ describe('pollEvents — gap detection', () => {
             expect(records[1].backfillTruncated).toBe(true);
             expect(records[1].backfillBudgetExceeded).toBe(true);
             expect(capturedBudget.progress).toBe(true);
-            expect(warn).toHaveBeenCalledWith(expect.stringContaining('time budget'));
+            expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^::warning::.*time budget/));
+        } finally {
+            warn.mockRestore();
+        }
+    });
+
+    it('records a page-limit truncation and warns with an annotation', async () => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const oldRecord = {
+            timestamp: subMinutes(new Date(), 120).toISOString(),
+            totalEvents: 5,
+            pagesCollected: 1,
+            eventsInFile: 5,
+            rateLimitRemaining: 4995,
+            rateLimitReached: false,
+            rateLimitReset: null,
+            oldestEventAt: subMinutes(new Date(), 130).toISOString(),
+            newestEventAt: subMinutes(new Date(), 121).toISOString(),
+            gapSuspected: false,
+            error: null,
+            collectionPath: dir,
+            repo: 'a/b',
+        };
+        await writeFile(
+            path.join(dir, `${today}-metadata.json`),
+            JSON.stringify([oldRecord]),
+        );
+        getGithubEvents.mockResolvedValueOnce(makeGhResponse(new Date().toISOString()));
+        getClosedIssuesInWindow.mockImplementationOnce(async (requestData, period, { budget }) => {
+            // eslint-disable-next-line no-param-reassign -- the real walk marks the shared budget at the page limit
+            budget.truncated = true;
+            return [];
+        });
+        const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+
+        try {
+            await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+            const records = JSON.parse(
+                await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
+            );
+            expect(records[1].gapSuspected).toBe(true);
+            expect(records[1].backfillTruncated).toBe(true);
+            expect(records[1].backfillBudgetExceeded).toBe(false);
+            expect(warn).toHaveBeenCalledWith(
+                expect.stringMatching(/^::warning::.*pagination limit/),
+            );
         } finally {
             warn.mockRestore();
         }
