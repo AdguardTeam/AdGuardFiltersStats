@@ -192,10 +192,33 @@ describe('getActivityAuthor — pull request reviews', () => {
 });
 
 describe('getActivityKey — reconcile identity', () => {
-    it('keys a closed issue by issue id', () => {
+    it('keys a closed issue by issue id and close time', () => {
         const event = {
             type: EVENT_TYPES.ISSUES_EVENT,
-            payload: { action: 'closed', issue: { id: 4001 } },
+            payload: {
+                action: 'closed',
+                issue: { id: 4001, closed_at: '2026-04-21T06:31:14Z' },
+            },
+        };
+
+        expect(getActivityKey(event)).toBe('issue-4001-closed-2026-04-21T06:31:14Z');
+    });
+
+    it('keys a second closure of the same issue by its own close time', () => {
+        const closeEvent = (closedAt) => ({
+            type: EVENT_TYPES.ISSUES_EVENT,
+            payload: { action: 'closed', issue: { id: 4001, closed_at: closedAt } },
+        });
+
+        // Reopen and close again: both closures are distinct activity.
+        expect(getActivityKey(closeEvent('2026-04-21T06:31:14Z')))
+            .not.toBe(getActivityKey(closeEvent('2026-04-21T18:00:00Z')));
+    });
+
+    it('falls back to the issue-only key when the payload has no close time', () => {
+        const event = {
+            type: EVENT_TYPES.ISSUES_EVENT,
+            payload: { action: 'closed', issue: { id: 4001, closed_at: null } },
         };
 
         expect(getActivityKey(event)).toBe('issue-4001-closed');

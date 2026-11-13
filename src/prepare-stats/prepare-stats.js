@@ -91,12 +91,17 @@ export const prepareStats = async (collectionPath, commonRequestData, timePeriod
 
     let injectedEvents = [];
     let reconcileError = null;
+    let reconcileTruncated = false;
     if (process.env.RECONCILE === 'true') {
         const reconciliation = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
         if (reconciliation.error) {
             reconcileError = reconciliation.error;
             logger.warn(`⚠️ Reconciliation failed: ${reconciliation.error}. Stats may under-report.`);
         } else {
+            reconcileTruncated = reconciliation.truncated;
+            if (reconcileTruncated) {
+                logger.warn('⚠️ Reconciliation stopped before it covered the window. Stats may under-report.');
+            }
             injectedEvents = reconciliation.injectedEvents;
             if (injectedEvents.length > 0) {
                 // Persist so future reports inherit the recovered events
@@ -124,10 +129,13 @@ export const prepareStats = async (collectionPath, commonRequestData, timePeriod
         : storedAndInjected;
     const events = dedupeById([...storedEvents, ...(commitEvents || [])]);
 
-    if (events.length === 0 && reconcileError) {
+    if (events.length === 0 && (reconcileError || reconcileTruncated)) {
+        const reason = reconcileError
+            ? `reconciliation failed: ${reconcileError}`
+            : 'reconciliation stopped before it covered the window';
         throw new Error(
             `No events available for window ${timePeriod.since}..${timePeriod.until} `
-            + `and reconciliation failed: ${reconcileError}`,
+            + `and ${reason}`,
         );
     }
 

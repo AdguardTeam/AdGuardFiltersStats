@@ -291,6 +291,19 @@ conventions not covered by the linter.
   client errors (other 4xx) or rate limit responses
   (`x-ratelimit-remaining: 0`, or `403`/`429` with `retry-after`). The
   issues, pull requests, and commits requests do not retry yet.
+  Gap reconciliation MUST stop within `RECONCILE_BUDGET_MS` from
+  [src/constants.js](./src/constants.js): both walks share one deadline,
+  check it before each page, and cap the request timeout by the remaining
+  budget. The budget MUST fit the poll step after the Events API walk
+  worst case. A failed backfill MUST NOT advance the gap window; the next
+  poll retries it. A backfill that stops at the time budget MUST also be
+  retried, and MUST be recorded separately from a page-limit truncation. A
+  page-limit truncation MUST NOT be retried, because the walks always
+  restart from the newest page. Because a retried walk can overlap stored
+  events, merging synthetic events MUST skip an event whose activity key
+  is already stored. The activity key MUST identify one occurrence, not
+  only the issue or pull request: an issue that is reopened and closed
+  again counts as two closures.
 - **Logging**: Use `console.log` for progress, `console.warn` for
   recoverable issues (rate-limit warnings, missing optional data), and
   `console.error` for fatal errors. Disable the `no-console` ESLint rule

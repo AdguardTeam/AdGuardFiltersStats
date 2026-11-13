@@ -12,6 +12,7 @@ import {
     getClosedIssuesInWindow,
     getPullsInWindow,
 } from '../../src/tools/gh-utils';
+import { RECONCILE_BUDGET_MS } from '../../src/constants';
 
 jest.mock('../../src/tools/gh-utils', () => ({
     getClosedIssuesInWindow: jest.fn(),
@@ -132,6 +133,90 @@ describe('mergeSyntheticEventsIntoCollection', () => {
             'synthetic-issue-closed-4001-1745217074000',
         ]);
     });
+
+    it('skips a synthetic event whose activity is already stored as a live event', async () => {
+        const dir = await mkdtemp(path.join(tmpdir(), 'merge-activity-'));
+        const liveEvent = {
+            id: 'live-close-4001',
+            type: 'IssuesEvent',
+            created_at: '2026-04-21T06:31:14Z',
+            actor: { login: 'zloyden' },
+            payload: {
+                action: 'closed',
+                issue: {
+                    id: 4001, number: 42, closed_at: '2026-04-21T06:31:14Z', labels: [],
+                },
+            },
+        };
+        await writeFile(
+            path.join(dir, '2026-04-21.jsonl'),
+            `${JSON.stringify(liveEvent)}\n`,
+        );
+
+        const synthetic = {
+            id: 'synthetic-issue-closed-4001-1745217074000',
+            type: 'IssuesEvent',
+            created_at: '2026-04-21T06:31:14Z',
+            actor: { login: 'zloyden' },
+            payload: {
+                action: 'closed',
+                issue: {
+                    id: 4001, number: 42, closed_at: '2026-04-21T06:31:14Z', labels: [],
+                },
+            },
+        };
+
+        await mergeSyntheticEventsIntoCollection(dir, [synthetic]);
+
+        const lines = (await readFile(path.join(dir, '2026-04-21.jsonl'), 'utf8'))
+            .trim().split('\n').map(JSON.parse);
+        expect(lines.map((e) => e.id)).toEqual(['live-close-4001']);
+    });
+
+    it('keeps the second closure of an issue that was reopened on the same day', async () => {
+        const dir = await mkdtemp(path.join(tmpdir(), 'merge-reclose-'));
+        // First closure, already stored as a live event.
+        const liveClose = {
+            id: 'live-close-4001',
+            type: 'IssuesEvent',
+            created_at: '2026-04-21T06:31:14Z',
+            actor: { login: 'zloyden' },
+            payload: {
+                action: 'closed',
+                issue: {
+                    id: 4001, number: 42, closed_at: '2026-04-21T06:31:14Z', labels: [],
+                },
+            },
+        };
+        await writeFile(
+            path.join(dir, '2026-04-21.jsonl'),
+            `${JSON.stringify(liveClose)}\n`,
+        );
+
+        // The issue was reopened and closed again, so the backfill returns a
+        // second closure of the same issue on the same day.
+        const secondClose = {
+            id: 'synthetic-issue-closed-4001-1745258400000',
+            type: 'IssuesEvent',
+            created_at: '2026-04-21T18:00:00Z',
+            actor: { login: 'zloyden' },
+            payload: {
+                action: 'closed',
+                issue: {
+                    id: 4001, number: 42, closed_at: '2026-04-21T18:00:00Z', labels: [],
+                },
+            },
+        };
+
+        await mergeSyntheticEventsIntoCollection(dir, [secondClose]);
+
+        const lines = (await readFile(path.join(dir, '2026-04-21.jsonl'), 'utf8'))
+            .trim().split('\n').map(JSON.parse);
+        expect(lines.map((e) => e.id)).toEqual([
+            'live-close-4001',
+            'synthetic-issue-closed-4001-1745258400000',
+        ]);
+    });
 });
 
 describe('reconcileWindow', () => {
@@ -167,5 +252,69 @@ describe('reconcileWindow', () => {
         expect(result.endpointsSucceeded).toBe(0);
         expect(result.error).toContain('issues fail');
         expect(result.error).toContain('pulls fail');
+    });
+
+    it('gives both walks the same budget and reports no truncation', async () => {
+        const budgets = [];
+        getClosedIssuesInWindow.mockImplementationOnce(async (c, t, { budget }) => {
+            budgets.push(budget);
+            return [];
+        });
+        getPullsInWindow.mockImplementationOnce(async (c, t, { budget }) => {
+            budgets.push(budget);
+            return [];
+        });
+        const before = Date.now();
+
+        const result = await reconcileWindow(
+            commonRequestData,
+            timePeriod,
+            repoMeta,
+            { budgetMs: 1000, progress: true },
+        );
+
+        expect(budgets).toHaveLength(2);
+        expect(budgets[0]).toBe(budgets[1]);
+        expect(budgets[0].progress).toBe(true);
+        expect(budgets[0].deadline).toBeGreaterThanOrEqual(before + 1000);
+        expect(budgets[0].deadline).toBeLessThanOrEqual(Date.now() + 1000);
+        expect(result.truncated).toBe(false);
+        expect(result.budgetExceeded).toBe(false);
+    });
+
+    it('reports truncation when a walk stops early', async () => {
+        getClosedIssuesInWindow.mockImplementationOnce(async (c, t, { budget }) => {
+            // eslint-disable-next-line no-param-reassign -- the real walk marks the shared budget
+            budget.truncated = true;
+            // eslint-disable-next-line no-param-reassign -- the real walk marks the shared budget
+            budget.budgetExceeded = true;
+            return [];
+        });
+        getPullsInWindow.mockResolvedValueOnce([]);
+
+        const result = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
+
+        expect(result.truncated).toBe(true);
+        expect(result.budgetExceeded).toBe(true);
+        expect(result.error).toBeNull();
+    });
+
+    it('uses the 180 s default budget and does not exceed it', async () => {
+        expect(RECONCILE_BUDGET_MS).toBe(180 * 1000);
+        const budgets = [];
+        getClosedIssuesInWindow.mockImplementationOnce(async (c, t, { budget }) => {
+            budgets.push(budget);
+            return [];
+        });
+        getPullsInWindow.mockImplementationOnce(async (c, t, { budget }) => {
+            budgets.push(budget);
+            return [];
+        });
+        const before = Date.now();
+
+        await reconcileWindow(commonRequestData, timePeriod, repoMeta);
+
+        expect(budgets[0].deadline).toBeGreaterThanOrEqual(before + 180 * 1000);
+        expect(budgets[0].deadline).toBeLessThanOrEqual(Date.now() + 180 * 1000);
     });
 });

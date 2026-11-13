@@ -30,6 +30,8 @@ jest.mock('../../src/tools/gh-utils', () => {
 // eslint-disable-next-line import/first
 import { prepareStats } from '../../src/prepare-stats';
 // eslint-disable-next-line import/first
+import { logger } from '../../src/tools/logger';
+// eslint-disable-next-line import/first
 import { EXCLUDED_USERNAMES } from '../../src/constants';
 
 const reconcileFixtureDir = path.join(__dirname, '..', 'test-files', 'reconcile');
@@ -317,6 +319,64 @@ describe('prepareStats — merged pull requests from reduced payloads', () => {
             expect(stats.activitiesByUser.user1.newPulls).toBe(1);
             // The live reduced event is replaced by the REST event.
             expect(stats.activitiesByUser.merger).toBeUndefined();
+        });
+
+        it('warns when reconciliation stops before it covers the window', async () => {
+            const dir = await writeCollection([{
+                id: 'live-comment',
+                type: 'IssueCommentEvent',
+                created_at: '2026-11-01T12:00:00Z',
+                actor: { login: 'alice' },
+                payload: { action: 'created', issue: { labels: [] } },
+            }], 'stats-truncated-');
+            // eslint-disable-next-line global-require
+            const gh = require('../../src/tools/gh-utils');
+            gh.getClosedIssuesInWindow.mockImplementationOnce(async (c, t, { budget }) => {
+                // eslint-disable-next-line no-param-reassign -- the real walk marks the shared budget
+                budget.truncated = true;
+                // eslint-disable-next-line no-param-reassign -- the real walk marks the shared budget
+                budget.budgetExceeded = true;
+                return [];
+            });
+            gh.getPullsInWindow.mockResolvedValueOnce([]);
+            const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+
+            try {
+                await prepareStats(
+                    dir,
+                    { owner: 'AdguardTeam', repo: 'AdguardFilters' },
+                    prWindow,
+                );
+
+                expect(warn).toHaveBeenCalledWith(expect.stringContaining('Reconciliation stopped'));
+            } finally {
+                warn.mockRestore();
+            }
+        });
+
+        it('throws when the collection is empty and reconciliation is truncated', async () => {
+            const dir = await mkdtemp(path.join(tmpdir(), 'stats-truncated-empty-'));
+            // eslint-disable-next-line global-require
+            const gh = require('../../src/tools/gh-utils');
+            gh.getClosedIssuesInWindow.mockImplementationOnce(async (c, t, { budget }) => {
+                // eslint-disable-next-line no-param-reassign -- the real walk marks the shared budget
+                budget.truncated = true;
+                // eslint-disable-next-line no-param-reassign -- the real walk marks the shared budget
+                budget.budgetExceeded = true;
+                return [];
+            });
+            gh.getPullsInWindow.mockResolvedValueOnce([]);
+            const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+
+            try {
+                await expect(prepareStats(
+                    dir,
+                    { owner: 'AdguardTeam', repo: 'AdguardFilters' },
+                    prWindow,
+                )).rejects.toThrow(/stopped before it covered the window/i);
+            } finally {
+                warn.mockRestore();
+            }
         });
     });
 });
