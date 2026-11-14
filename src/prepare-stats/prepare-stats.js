@@ -94,18 +94,28 @@ export const prepareStats = async (collectionPath, commonRequestData, timePeriod
     let reconcileTruncated = false;
     if (process.env.RECONCILE === 'true') {
         const reconciliation = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
-        if (reconciliation.error) {
-            reconcileError = reconciliation.error;
-            logger.warn(`⚠️ Reconciliation failed: ${reconciliation.error}. Stats may under-report.`);
-        } else {
-            reconcileTruncated = reconciliation.truncated;
-            if (reconcileTruncated) {
-                logger.warn('⚠️ Reconciliation stopped before it covered the window. Stats may under-report.');
-            }
-            injectedEvents = reconciliation.injectedEvents;
-            if (injectedEvents.length > 0) {
-                // Persist so future reports inherit the recovered events
+        injectedEvents = reconciliation.injectedEvents;
+        reconcileError = reconciliation.error;
+        reconcileTruncated = reconciliation.truncated;
+        if (reconcileError) {
+            logger.warn(`⚠️ Reconciliation failed: ${reconcileError}. Stats may under-report.`);
+        }
+        if (reconcileTruncated) {
+            logger.warn('⚠️ Reconciliation stopped before it covered the window. Stats may under-report.');
+        }
+        // A failed walk loses only its own data: use and persist what the
+        // other walk recovered. The activity-key filter below still counts
+        // each recovered activity once, also when a retry returns it again.
+        // Persistence is best effort: the report already holds the events, so
+        // a write failure must not fail the command.
+        if (injectedEvents.length > 0) {
+            try {
                 await mergeSyntheticEventsIntoCollection(collectionPath, injectedEvents);
+            } catch (mergeError) {
+                logger.warn(
+                    `⚠️ Failed to store the recovered events: ${mergeError.message}.`
+                    + ' The report still uses them; the next run fetches them again.',
+                );
             }
         }
     }

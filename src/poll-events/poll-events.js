@@ -93,10 +93,24 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
             backfillTruncated = truncated;
             backfillBudgetExceeded = budgetExceeded;
             backfillError = reconciliationError;
+            // A failed walk loses only its own data: store what the other walk
+            // recovered. The error still keeps the window from advancing, so
+            // the next poll retries the failed endpoint. A write failure must
+            // not fail the poll or hide the reconciliation error, so record it
+            // as another reason to retry the window.
+            if (injectedEvents.length > 0) {
+                try {
+                    await mergeSyntheticEventsIntoCollection(collectionPath, injectedEvents);
+                } catch (mergeError) {
+                    const mergeMessage = `failed to store the recovered events: ${mergeError.message}`;
+                    backfillError = backfillError
+                        ? `${backfillError}; ${mergeMessage}`
+                        : mergeMessage;
+                    logger.warn(`⚠️ ${mergeMessage}. The next poll retries the window.`);
+                }
+            }
             if (backfillError) {
                 logger.warn(`⚠️ Gap detected but backfill failed: ${backfillError}`);
-            } else if (injectedEvents.length > 0) {
-                await mergeSyntheticEventsIntoCollection(collectionPath, injectedEvents);
             }
             if (backfillBudgetExceeded) {
                 logger.warn(

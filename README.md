@@ -81,10 +81,12 @@ for the requested window when `RECONCILE=true`. This recovers issue
 closures and PR open/merge events that were missed by the Events-API
 poller (the Events API only retains the 300 most recent public events).
 The reconciliation stops at a 3-minute budget and emits a warning when it
-cannot cover the whole window. When the REST API is unavailable or the
-reconciliation is truncated, the tools emit a warning; if the window is
-also empty in the local collection they exit non-zero rather than
-producing an under-reported message.
+cannot cover the whole window. When one REST request fails, the tools still
+use the events returned by the other request. When the REST API is
+unavailable or the reconciliation is truncated and no request returned any
+events, the tools emit a warning. If the window is also empty in the local
+collection, they exit non-zero instead of producing an under-reported
+message.
 
 Per-poll diagnostics are appended to `<date>-metadata.json` (one
 record per poll) so polling gaps can be analyzed after the fact.
@@ -163,6 +165,10 @@ gap from the previous successful poll. The metadata records
 30-page limit, and `backfillBudgetExceeded: true` for the budget case. A
 page-limit truncation is not retried, because the REST walks always
 restart from the newest page and a retry cannot reach the un-walked tail.
+A failed REST walk does not discard the events that the other walk
+recovered: the poll stores them and still retries the window. A failure to
+store them is a warning: the poll still succeeds, records the failure as the
+reason to retry, and the next poll retries the window.
 
 A retried backfill can overlap events that are already stored. Synthetic
 events whose activity key is already present in the collection are

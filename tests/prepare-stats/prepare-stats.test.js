@@ -1,5 +1,5 @@
 import {
-    mkdtemp, copyFile, writeFile,
+    mkdtemp, copyFile, writeFile, readFile, readdir,
 } from 'fs/promises';
 import { readFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -40,6 +40,14 @@ const botClosedIssues = JSON.parse(
     readFileSync(path.join(reconcileFixtureDir, 'bot-closed-issues.json'), 'utf8'),
 );
 
+const closedIssuesFixture = JSON.parse(
+    readFileSync(path.join(reconcileFixtureDir, 'closed-issues.json'), 'utf8'),
+);
+
+const pullsFixture = JSON.parse(
+    readFileSync(path.join(reconcileFixtureDir, 'pulls.json'), 'utf8'),
+);
+
 const writeCollection = async (events, prefix = 'stats-') => {
     const dir = await mkdtemp(path.join(tmpdir(), prefix));
     await writeFile(
@@ -47,6 +55,17 @@ const writeCollection = async (events, prefix = 'stats-') => {
         `${events.map((e) => JSON.stringify(e)).join('\n')}\n`,
     );
     return dir;
+};
+
+// Read every day file: the merge aligns an event to its own local date.
+const readCollectionEvents = async (dir) => {
+    const files = (await readdir(dir)).filter((name) => name.endsWith('.jsonl'));
+    const contents = await Promise.all(
+        files.map((name) => readFile(path.join(dir, name), 'utf8')),
+    );
+    return contents
+        .flatMap((raw) => raw.trim().split('\n').filter(Boolean))
+        .map((line) => JSON.parse(line));
 };
 
 describe('prepareStats — reconciles missing closures from REST', () => {
@@ -288,11 +307,138 @@ describe('prepareStats — merged pull requests from reduced payloads', () => {
     });
 
     describe('with reconciliation', () => {
+        const reconcileWindow = { since: '2026-04-21T00:00:00Z', until: '2026-04-21T23:59:59Z' };
+
         beforeEach(() => {
             process.env.RECONCILE = 'true';
         });
         afterEach(() => {
             delete process.env.RECONCILE;
+            // eslint-disable-next-line global-require
+            const gh = require('../../src/tools/gh-utils');
+            gh.getClosedIssuesInWindow.mockReset();
+            gh.getClosedIssuesInWindow.mockResolvedValue(closedIssuesFixture);
+            gh.getPullsInWindow.mockReset();
+            gh.getPullsInWindow.mockResolvedValue(pullsFixture);
+        });
+
+        it('uses the pulls walk events when the issues walk fails', async () => {
+            const dir = await mkdtemp(path.join(tmpdir(), 'stats-partial-pulls-'));
+            // eslint-disable-next-line global-require
+            const gh = require('../../src/tools/gh-utils');
+            gh.getClosedIssuesInWindow.mockRejectedValueOnce(new Error('issues rate limit'));
+            gh.getPullsInWindow.mockResolvedValueOnce(pullsFixture);
+            const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+
+            try {
+                const stats = await prepareStats(
+                    dir,
+                    { owner: 'AdguardTeam', repo: 'AdguardFilters' },
+                    reconcileWindow,
+                );
+
+                expect(warn).toHaveBeenCalledWith(expect.stringContaining('Reconciliation failed'));
+                expect(stats.repoStat.mergedPulls).toBe(1);
+                expect(stats.repoStat.newPulls).toBe(2);
+                expect(stats.activitiesByUser.user1.mergedPulls).toBe(1);
+                expect(stats.activitiesByUser.user2.newPulls).toBe(1);
+                // The recovered events are persisted for the next report.
+                const stored = await readCollectionEvents(dir);
+                expect(stored.map((e) => e.id)).toEqual(expect.arrayContaining([
+                    'synthetic-pr-opened-5001',
+                    'synthetic-pr-merged-5001',
+                    'synthetic-pr-opened-5002',
+                ]));
+            } finally {
+                warn.mockRestore();
+            }
+        });
+
+        it('uses the issues walk events when the pulls walk fails', async () => {
+            const dir = await mkdtemp(path.join(tmpdir(), 'stats-partial-issues-'));
+            // eslint-disable-next-line global-require
+            const gh = require('../../src/tools/gh-utils');
+            gh.getClosedIssuesInWindow.mockResolvedValueOnce(closedIssuesFixture);
+            gh.getPullsInWindow.mockRejectedValueOnce(new Error('pulls rate limit'));
+            const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+
+            try {
+                const stats = await prepareStats(
+                    dir,
+                    { owner: 'AdguardTeam', repo: 'AdguardFilters' },
+                    reconcileWindow,
+                );
+
+                expect(warn).toHaveBeenCalledWith(expect.stringContaining('Reconciliation failed'));
+                expect(stats.repoStat.resolvedIssues).toBe(2);
+                expect(stats.repoStat.closedAsStaleIssues).toBe(0);
+                expect(stats.activitiesByUser.user1.resolvedIssues).toBe(2);
+                // The recovered events are persisted for the next report.
+                const stored = await readCollectionEvents(dir);
+                expect(stored.map((e) => e.id)).toEqual(expect.arrayContaining([
+                    `synthetic-issue-closed-4001-${new Date('2026-04-21T06:31:14Z').getTime()}`,
+                    `synthetic-issue-closed-4002-${new Date('2026-04-21T08:00:00Z').getTime()}`,
+                ]));
+            } finally {
+                warn.mockRestore();
+            }
+        });
+
+        it('does not count the same recovered activity twice after a retry', async () => {
+            const dir = await mkdtemp(path.join(tmpdir(), 'stats-partial-retry-'));
+            // eslint-disable-next-line global-require
+            const gh = require('../../src/tools/gh-utils');
+            gh.getClosedIssuesInWindow.mockRejectedValueOnce(new Error('issues rate limit'));
+            gh.getPullsInWindow.mockResolvedValueOnce(pullsFixture);
+
+            const first = await prepareStats(
+                dir,
+                { owner: 'AdguardTeam', repo: 'AdguardFilters' },
+                reconcileWindow,
+            );
+
+            // The retry returns the same pull requests, already persisted by
+            // the first run: each activity must still count once.
+            gh.getClosedIssuesInWindow.mockResolvedValueOnce([]);
+            gh.getPullsInWindow.mockResolvedValueOnce(pullsFixture);
+            const second = await prepareStats(
+                dir,
+                { owner: 'AdguardTeam', repo: 'AdguardFilters' },
+                reconcileWindow,
+            );
+
+            expect(first.repoStat.mergedPulls).toBe(1);
+            expect(second.repoStat.mergedPulls).toBe(1);
+            expect(second.repoStat.newPulls).toBe(2);
+        });
+
+        it('keeps the report when storing the recovered events fails', async () => {
+            const dir = await mkdtemp(path.join(tmpdir(), 'stats-partial-write-'));
+            // eslint-disable-next-line global-require
+            const gh = require('../../src/tools/gh-utils');
+            gh.getClosedIssuesInWindow.mockRejectedValueOnce(new Error('issues rate limit'));
+            gh.getPullsInWindow.mockResolvedValueOnce(pullsFixture);
+            // eslint-disable-next-line global-require
+            const fsUtils = require('../../src/tools/fs-utils');
+            const merge = jest.spyOn(fsUtils, 'mergeSyntheticEventsIntoCollection')
+                .mockRejectedValueOnce(new Error('disk full'));
+            const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+
+            try {
+                const stats = await prepareStats(
+                    dir,
+                    { owner: 'AdguardTeam', repo: 'AdguardFilters' },
+                    reconcileWindow,
+                );
+
+                // The report still counts the events it holds in memory.
+                expect(stats.repoStat.mergedPulls).toBe(1);
+                expect(stats.activitiesByUser.user1.mergedPulls).toBe(1);
+                expect(warn).toHaveBeenCalledWith(expect.stringContaining('disk full'));
+            } finally {
+                merge.mockRestore();
+                warn.mockRestore();
+            }
         });
 
         it('uses the REST author and does not count the live merge twice', async () => {
