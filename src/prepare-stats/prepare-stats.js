@@ -106,8 +106,17 @@ export const prepareStats = async (collectionPath, commonRequestData, timePeriod
         // A failed walk loses only its own data: use and persist what the
         // other walk recovered. The activity-key filter below still counts
         // each recovered activity once, also when a retry returns it again.
+        // Persistence is best effort: the report already holds the events, so
+        // a write failure must not fail the command.
         if (injectedEvents.length > 0) {
-            await mergeSyntheticEventsIntoCollection(collectionPath, injectedEvents);
+            try {
+                await mergeSyntheticEventsIntoCollection(collectionPath, injectedEvents);
+            } catch (mergeError) {
+                logger.warn(
+                    `⚠️ Failed to store the recovered events: ${mergeError.message}.`
+                    + ' The report still uses them; the next run fetches them again.',
+                );
+            }
         }
     }
 

@@ -617,4 +617,57 @@ describe('pollEvents — gap detection', () => {
             until: expect.any(String),
         });
     });
+
+    it('records a merge failure and retries the window', async () => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const oldRecord = {
+            timestamp: subMinutes(new Date(), 120).toISOString(),
+            totalEvents: 5,
+            pagesCollected: 1,
+            eventsInFile: 5,
+            rateLimitRemaining: 4995,
+            rateLimitReached: false,
+            rateLimitReset: null,
+            oldestEventAt: subMinutes(new Date(), 130).toISOString(),
+            newestEventAt: subMinutes(new Date(), 121).toISOString(),
+            gapSuspected: false,
+            error: null,
+            collectionPath: dir,
+            repo: 'a/b',
+        };
+        await writeFile(
+            path.join(dir, `${today}-metadata.json`),
+            JSON.stringify([oldRecord]),
+        );
+        getGithubEvents.mockResolvedValueOnce(makeGhResponse(new Date().toISOString()));
+        getClosedIssuesInWindow.mockResolvedValueOnce([{
+            id: 4001,
+            number: 42,
+            closed_at: subMinutes(new Date(), 60).toISOString(),
+            closed_by: { id: 7, login: 'zloyden' },
+            labels: [],
+        }]);
+        // eslint-disable-next-line global-require
+        const fsUtils = require('../../src/tools/fs-utils');
+        const merge = jest.spyOn(fsUtils, 'mergeSyntheticEventsIntoCollection')
+            .mockRejectedValueOnce(new Error('disk full'));
+        const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+
+        try {
+            const result = await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+            const records = JSON.parse(
+                await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
+            );
+            // The poll still succeeds, records the failure as the retry
+            // reason, and keeps the reconciliation error in the diagnostics.
+            expect(result.success).toBe(true);
+            expect(records[1].backfillError).toContain('disk full');
+            expect(warn).toHaveBeenCalledWith(expect.stringContaining('disk full'));
+            expect(warn.mock.calls.flat().join(' ')).toContain('The next poll retries');
+        } finally {
+            merge.mockRestore();
+            warn.mockRestore();
+        }
+    });
 });

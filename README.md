@@ -166,7 +166,9 @@ gap from the previous successful poll. The metadata records
 page-limit truncation is not retried, because the REST walks always
 restart from the newest page and a retry cannot reach the un-walked tail.
 A failed REST walk does not discard the events that the other walk
-recovered: the poll stores them and still retries the window.
+recovered: the poll stores them and still retries the window. A failure to
+store them is a warning: the poll still succeeds, records the failure as the
+reason to retry, and the next poll retries the window.
 
 A retried backfill can overlap events that are already stored. Synthetic
 events whose activity key is already present in the collection are

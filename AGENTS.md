@@ -297,9 +297,12 @@ conventions not covered by the linter.
   budget. The budget MUST fit the poll step after the Events API walk
   worst case. A failed backfill MUST NOT advance the gap window; the next
   poll retries it. A failed walk MUST still store and use the events that
-  the other walk recovered: the error MUST NOT discard them. A backfill
-  that stops at the time budget MUST also be retried, and MUST be recorded
-  separately from a page-limit truncation. A
+  the other walk recovered: the error MUST NOT discard them. Persisting them
+  MUST be best effort: a write failure MUST warn, MUST NOT fail the command,
+  and MUST NOT hide the reconciliation error. A poll that cannot store the
+  events MUST record the failure as a retry reason. A backfill that stops at
+  the time budget MUST also be retried, and MUST be recorded separately from
+  a page-limit truncation. A
   page-limit truncation MUST NOT be retried, because the walks always
   restart from the newest page. Because a retried walk can overlap stored
   events, merging synthetic events MUST skip an event whose activity key

@@ -412,6 +412,35 @@ describe('prepareStats — merged pull requests from reduced payloads', () => {
             expect(second.repoStat.newPulls).toBe(2);
         });
 
+        it('keeps the report when storing the recovered events fails', async () => {
+            const dir = await mkdtemp(path.join(tmpdir(), 'stats-partial-write-'));
+            // eslint-disable-next-line global-require
+            const gh = require('../../src/tools/gh-utils');
+            gh.getClosedIssuesInWindow.mockRejectedValueOnce(new Error('issues rate limit'));
+            gh.getPullsInWindow.mockResolvedValueOnce(pullsFixture);
+            // eslint-disable-next-line global-require
+            const fsUtils = require('../../src/tools/fs-utils');
+            const merge = jest.spyOn(fsUtils, 'mergeSyntheticEventsIntoCollection')
+                .mockRejectedValueOnce(new Error('disk full'));
+            const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+
+            try {
+                const stats = await prepareStats(
+                    dir,
+                    { owner: 'AdguardTeam', repo: 'AdguardFilters' },
+                    reconcileWindow,
+                );
+
+                // The report still counts the events it holds in memory.
+                expect(stats.repoStat.mergedPulls).toBe(1);
+                expect(stats.activitiesByUser.user1.mergedPulls).toBe(1);
+                expect(warn).toHaveBeenCalledWith(expect.stringContaining('disk full'));
+            } finally {
+                merge.mockRestore();
+                warn.mockRestore();
+            }
+        });
+
         it('uses the REST author and does not count the live merge twice', async () => {
             const dir = await writeCollection([mergedEvent('merger', 5001)]);
             // eslint-disable-next-line global-require
