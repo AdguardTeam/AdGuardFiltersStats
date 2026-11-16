@@ -125,15 +125,32 @@ const writeEventsToFile = async (path, events, flag) => {
         });
 
         const writeStream = createWriteStream(path, { flags: flag });
-        writeStream.on('finish', resolve);
-        writeStream.on('error', reject);
-        readable.on('error', reject);
-
-        chain([
+        // `stream-chain` re-emits the error of every inner stream on the chain
+        // itself. Without a listener on the chain, a filesystem write failure
+        // (for example EACCES on a read-only collection) is an unhandled
+        // `error` event that crashes the process instead of rejecting this
+        // promise. The callers then cannot treat the write as best effort.
+        const writeChain = chain([
             readable,
             (event) => `${JSON.stringify(event)}\n`,
             writeStream,
         ]);
+
+        /**
+         * Rejects the write and releases the streams of a failed chain.
+         *
+         * @param {Error} error Error emitted by the chain or by a stream.
+         */
+        const onError = (error) => {
+            writeChain.destroy();
+            writeStream.destroy();
+            readable.destroy();
+            reject(error);
+        };
+
+        writeStream.on('finish', resolve);
+        writeChain.on('error', onError);
+        readable.on('error', onError);
 
         events.forEach((event) => {
             readable.push(event);

@@ -284,6 +284,14 @@ conventions not covered by the linter.
   IIFE in `try/catch`, log via `console.error`, and `process.exit(1)` on
   failure. Library functions SHOULD throw normal `Error` instances; let
   the caller decide how to recover.
+- **Stream errors**: A stream pipeline MUST surface an inner-stream error
+  as a rejection of the exported async function, never as a process-level
+  unhandled `error` event. `stream-chain` re-emits the error of every inner
+  stream on the chain itself, so a `chain()` MUST get its own `error`
+  listener in addition to the listeners on the individual streams. A failed
+  collection write MUST stay recoverable by the caller: `github-poll`
+  records the failed poll and exits non-zero, and a best-effort merge warns
+  instead of failing the command.
 - **Retries**: GitHub Events API page requests MUST retry transient
   failures (network errors, malformed response bodies, 5xx responses)
   with exponential backoff through `withRetry` from
@@ -296,8 +304,13 @@ conventions not covered by the linter.
   check it before each page, and cap the request timeout by the remaining
   budget. The budget MUST fit the poll step after the Events API walk
   worst case. A failed backfill MUST NOT advance the gap window; the next
-  poll retries it. A backfill that stops at the time budget MUST also be
-  retried, and MUST be recorded separately from a page-limit truncation. A
+  poll retries it. A failed walk MUST still store and use the events that
+  the other walk recovered: the error MUST NOT discard them. Persisting them
+  MUST be best effort: a write failure MUST warn, MUST NOT fail the command,
+  and MUST NOT hide the reconciliation error. A poll that cannot store the
+  events MUST record the failure as a retry reason. A backfill that stops at
+  the time budget MUST also be retried, and MUST be recorded separately from
+  a page-limit truncation. A
   page-limit truncation MUST NOT be retried, because the walks always
   restart from the newest page. Because a retried walk can overlap stored
   events, merging synthetic events MUST skip an event whose activity key

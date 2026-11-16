@@ -1,7 +1,11 @@
-import { mkdtemp, writeFile } from 'fs/promises';
+import { mkdtemp, writeFile, chmod } from 'fs/promises';
 import { tmpdir } from 'os';
 import path from 'path';
-import { readMetadataRecords } from '../../src/tools/fs-utils';
+import {
+    readMetadataRecords,
+    writePollToCollection,
+    mergeSyntheticEventsIntoCollection,
+} from '../../src/tools/fs-utils';
 
 describe('readMetadataRecords', () => {
     let dir;
@@ -34,5 +38,46 @@ describe('readMetadataRecords', () => {
         await writeFile(file, JSON.stringify(records), 'utf8');
         const result = await readMetadataRecords(file);
         expect(result).toEqual(records);
+    });
+});
+
+describe('write failures reach the caller as rejections', () => {
+    // A non-writable path blocks the write only for a non-root user, so the
+    // assertions below have nothing to prove when the suite runs as root.
+    const canBeBlocked = typeof process.getuid === 'function' && process.getuid() !== 0;
+    const itUnlessRoot = canBeBlocked ? it : it.skip;
+
+    const event = {
+        id: 'evt-1',
+        type: 'IssuesEvent',
+        created_at: '2026-04-21T06:31:14Z',
+        actor: { login: 'user1' },
+        payload: { action: 'opened', issue: {} },
+    };
+
+    itUnlessRoot('writePollToCollection rejects with EACCES for a read-only collection', async () => {
+        const dir = await mkdtemp(path.join(tmpdir(), 'fs-ro-poll-'));
+        await chmod(dir, 0o555);
+        try {
+            // The chain re-emits the write-stream error; without a listener on
+            // the chain this is an unhandled `error` event and the process dies.
+            await expect(writePollToCollection(dir, [event])).rejects.toMatchObject({
+                code: 'EACCES',
+            });
+        } finally {
+            await chmod(dir, 0o755);
+        }
+    });
+
+    itUnlessRoot('mergeSyntheticEventsIntoCollection rejects with EACCES for a read-only collection', async () => {
+        const dir = await mkdtemp(path.join(tmpdir(), 'fs-ro-merge-'));
+        await chmod(dir, 0o555);
+        try {
+            await expect(mergeSyntheticEventsIntoCollection(dir, [event])).rejects.toMatchObject({
+                code: 'EACCES',
+            });
+        } finally {
+            await chmod(dir, 0o755);
+        }
     });
 });

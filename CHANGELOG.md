@@ -26,6 +26,17 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 - `github-stats` and `github-publish` with `RECONCILE=true` now use the same
   3-minute budget and warn when reconciliation cannot cover the whole
   window.
+- `github-poll`, `github-stats`, and `github-publish` now keep the events
+  that a reconciliation walk recovers when the other walk fails.
+  `github-poll` still does not count the failed backfill as a successful
+  poll, so the next poll retries the window, and a repeated event is not
+  counted twice. A failure to store the recovered events is a warning, not
+  a command failure, and the poll records it as the retry reason.
+- A failed write to the collection no longer crashes the process with an
+  unhandled stream `error` (for example `EACCES` on a read-only collection).
+  `github-poll` records the failed poll and exits non-zero, and
+  `github-stats` and `github-publish` keep producing the report from the
+  events they already hold.
 
 ## 1.1.5
 
