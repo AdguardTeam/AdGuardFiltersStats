@@ -284,6 +284,14 @@ conventions not covered by the linter.
   IIFE in `try/catch`, log via `console.error`, and `process.exit(1)` on
   failure. Library functions SHOULD throw normal `Error` instances; let
   the caller decide how to recover.
+- **Stream errors**: A stream pipeline MUST surface an inner-stream error
+  as a rejection of the exported async function, never as a process-level
+  unhandled `error` event. `stream-chain` re-emits the error of every inner
+  stream on the chain itself, so a `chain()` MUST get its own `error`
+  listener in addition to the listeners on the individual streams. A failed
+  collection write MUST stay recoverable by the caller: `github-poll`
+  records the failed poll and exits non-zero, and a best-effort merge warns
+  instead of failing the command.
 - **Retries**: GitHub Events API page requests MUST retry transient
   failures (network errors, malformed response bodies, 5xx responses)
   with exponential backoff through `withRetry` from
