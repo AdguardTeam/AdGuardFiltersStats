@@ -1,5 +1,5 @@
 import path from 'path';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { getGithubEvents } from '../tools/gh-utils';
 import { reconcileWindow } from '../tools/reconcile';
 import { EVENT_EXPIRATION_DAYS, POLL_GAP_THRESHOLD_MS } from '../constants';
@@ -12,6 +12,19 @@ import {
     readMetadataRecords,
     mergeSyntheticEventsIntoCollection,
 } from '../tools/fs-utils';
+
+/**
+ * Builds the path to the metadata sidecar of a given day.
+ *
+ * @param {string} collectionPath Path to events collection.
+ * @param {Date} date Day of the sidecar.
+ *
+ * @returns {string} Path to the metadata sidecar.
+ */
+const getMetadataPath = (collectionPath, date) => {
+    const day = format(date, 'yyyy-MM-dd');
+    return path.join(collectionPath, `${day}-metadata.json`);
+};
 
 /**
  * Polls events from Github Events API and stores them on a given path.
@@ -41,17 +54,32 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
         const oldestEventAt = new Date(Math.min(...eventTimes)).toISOString();
         const newestEventAt = new Date(Math.max(...eventTimes)).toISOString();
 
-        // Read previous metadata to detect gap
-        const today = format(new Date(), 'yyyy-MM-dd');
-        const metadataPath = path.join(collectionPath, `${today}-metadata.json`);
-        const prevRecords = await readMetadataRecords(metadataPath);
+        // Read the current and the previous day metadata to detect a gap. A
+        // poll after midnight must still find the last successful poll of the
+        // previous day, and a failed or budget-stopped backfill recorded before
+        // midnight must still be retried. Two sidecars are enough: the read
+        // stays bounded and never scans the whole collection. A sidecar that
+        // cannot be read is not authoritative, so it must not fail a poll that
+        // already stored its events.
+        const now = new Date();
+        const metadataPath = getMetadataPath(collectionPath, now);
+        const previousMetadataPath = getMetadataPath(collectionPath, subDays(now, 1));
+        const previousRecords = await readMetadataRecords(previousMetadataPath).catch((error) => {
+            logger.warn(`⚠️ Cannot read ${previousMetadataPath}: ${error.message}`);
+            return [];
+        });
+        const todayRecords = await readMetadataRecords(metadataPath);
+        // The previous day's records come first: the sidecar day is taken from
+        // a clock read after the Events fetch, so it is never earlier than the
+        // record's own timestamp, and each sidecar is append-only. The
+        // concatenated order is therefore chronological.
         // A failed backfill and a backfill that ran out of budget must not
         // move the window forward: the next poll retries the gap from the
         // last successful poll. A page-limit truncation still counts as
         // successful because every walk starts from the newest page, so a
         // retry cannot reach the un-walked tail.
-        const lastSuccessful = prevRecords
-            .filter((r) => !r.error && !r.backfillError && !r.backfillBudgetExceeded)
+        const lastSuccessful = [...previousRecords, ...todayRecords]
+            .filter((record) => !record.error && !record.backfillError && !record.backfillBudgetExceeded)
             .at(-1);
 
         let gapSuspected = false;
@@ -154,10 +182,9 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
     } catch (error) {
         const rateLimitReached = error?.rateLimitReached === true;
         const rateLimitReset = error?.rateLimitReset ?? null;
-        const today = format(new Date(), 'yyyy-MM-dd');
         try {
             await appendMetadataRecord(
-                path.join(collectionPath, `${today}-metadata.json`),
+                getMetadataPath(collectionPath, new Date()),
                 {
                     timestamp: new Date().toISOString(),
                     totalEvents: 0,

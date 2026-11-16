@@ -174,6 +174,13 @@ A retried backfill can overlap events that are already stored. Synthetic
 events whose activity key is already present in the collection are
 skipped, so a retry does not count one closure or pull request twice.
 
+To find the last successful poll, `github-poll` reads the metadata sidecar
+of the current day and of the previous day only. A gap that crosses
+midnight is therefore detected, and a failed or budget-stopped backfill
+from the previous day is retried after midnight. No older sidecar is read,
+so a retry stops when the failed poll is two days old, and a poll outage
+longer than one day is not detected.
+
 #### Metadata fields
 
 The `YYYY-MM-DD-metadata.json` sidecar contains a JSON **array** of records, one per
