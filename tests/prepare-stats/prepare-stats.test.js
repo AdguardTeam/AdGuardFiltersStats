@@ -1,5 +1,5 @@
 import {
-    mkdtemp, copyFile, writeFile, readFile, readdir,
+    mkdtemp, copyFile, writeFile, readFile, readdir, chmod,
 } from 'fs/promises';
 import { readFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -67,6 +67,10 @@ const readCollectionEvents = async (dir) => {
         .flatMap((raw) => raw.trim().split('\n').filter(Boolean))
         .map((line) => JSON.parse(line));
 };
+
+// A non-writable directory blocks the write only for a non-root user.
+const canBlockWrites = typeof process.getuid === 'function' && process.getuid() !== 0;
+const itUnlessRoot = canBlockWrites ? it : it.skip;
 
 describe('prepareStats — reconciles missing closures from REST', () => {
     beforeEach(() => {
@@ -412,17 +416,16 @@ describe('prepareStats — merged pull requests from reduced payloads', () => {
             expect(second.repoStat.newPulls).toBe(2);
         });
 
-        it('keeps the report when storing the recovered events fails', async () => {
+        itUnlessRoot('keeps the report when storing the recovered events fails', async () => {
             const dir = await mkdtemp(path.join(tmpdir(), 'stats-partial-write-'));
             // eslint-disable-next-line global-require
             const gh = require('../../src/tools/gh-utils');
             gh.getClosedIssuesInWindow.mockRejectedValueOnce(new Error('issues rate limit'));
             gh.getPullsInWindow.mockResolvedValueOnce(pullsFixture);
-            // eslint-disable-next-line global-require
-            const fsUtils = require('../../src/tools/fs-utils');
-            const merge = jest.spyOn(fsUtils, 'mergeSyntheticEventsIntoCollection')
-                .mockRejectedValueOnce(new Error('disk full'));
             const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+            // A collection that is readable but not writable fails the real
+            // write stream with EACCES; the report must survive it.
+            await chmod(dir, 0o555);
 
             try {
                 const stats = await prepareStats(
@@ -434,9 +437,9 @@ describe('prepareStats — merged pull requests from reduced payloads', () => {
                 // The report still counts the events it holds in memory.
                 expect(stats.repoStat.mergedPulls).toBe(1);
                 expect(stats.activitiesByUser.user1.mergedPulls).toBe(1);
-                expect(warn).toHaveBeenCalledWith(expect.stringContaining('disk full'));
+                expect(warn).toHaveBeenCalledWith(expect.stringContaining('EACCES'));
             } finally {
-                merge.mockRestore();
+                await chmod(dir, 0o755);
                 warn.mockRestore();
             }
         });

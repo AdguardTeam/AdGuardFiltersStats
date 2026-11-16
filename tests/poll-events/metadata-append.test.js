@@ -1,5 +1,5 @@
 import {
-    mkdtemp, readFile, writeFile,
+    mkdtemp, readFile, writeFile, chmod,
 } from 'fs/promises';
 import { tmpdir } from 'os';
 import path from 'path';
@@ -83,6 +83,12 @@ jest.mock('../../src/tools/gh-utils', () => ({
 import { pollEvents } from '../../src/poll-events';
 // eslint-disable-next-line import/first
 import { getGithubEvents } from '../../src/tools/gh-utils';
+// eslint-disable-next-line import/first
+import { logger } from '../../src/tools/logger';
+
+// A non-writable directory blocks the write only for a non-root user.
+const canBlockWrites = typeof process.getuid === 'function' && process.getuid() !== 0;
+const itUnlessRoot = canBlockWrites ? it : it.skip;
 
 describe('pollEvents — metadata is append-only', () => {
     it('writes one new record per call to the per-day file', async () => {
@@ -102,6 +108,26 @@ describe('pollEvents — metadata is append-only', () => {
             expect(parsed[0].totalEvents).toBe(1);
         } finally {
             jest.useRealTimers();
+        }
+    });
+
+    itUnlessRoot('returns a failure instead of crashing when the collection is not writable', async () => {
+        const dir = await mkdtemp(path.join(tmpdir(), 'poll-ro-'));
+        await chmod(dir, 0o555);
+        const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {});
+
+        try {
+            const result = await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('EACCES');
+            expect(errorSpy).toHaveBeenCalledWith(
+                'Error in pollEvents:',
+                expect.stringContaining('EACCES'),
+            );
+        } finally {
+            await chmod(dir, 0o755);
+            errorSpy.mockRestore();
         }
     });
 

@@ -1,5 +1,5 @@
 import {
-    mkdtemp, writeFile, readFile, readdir,
+    mkdtemp, writeFile, readFile, readdir, chmod,
 } from 'fs/promises';
 import { tmpdir } from 'os';
 import path from 'path';
@@ -52,6 +52,10 @@ const readStoredEvents = async (dir) => {
         .flatMap((raw) => raw.trim().split('\n').filter(Boolean))
         .map((line) => JSON.parse(line));
 };
+
+// A non-writable file blocks the write only for a non-root user.
+const canBlockWrites = typeof process.getuid === 'function' && process.getuid() !== 0;
+const itUnlessRoot = canBlockWrites ? it : it.skip;
 
 describe('pollEvents — gap detection', () => {
     let dir;
@@ -618,8 +622,9 @@ describe('pollEvents — gap detection', () => {
         });
     });
 
-    it('records a merge failure and retries the window', async () => {
+    itUnlessRoot('records a merge failure and retries the window', async () => {
         const today = format(new Date(), 'yyyy-MM-dd');
+        const now = new Date().toISOString();
         const oldRecord = {
             timestamp: subMinutes(new Date(), 120).toISOString(),
             totalEvents: 5,
@@ -639,18 +644,21 @@ describe('pollEvents — gap detection', () => {
             path.join(dir, `${today}-metadata.json`),
             JSON.stringify([oldRecord]),
         );
-        getGithubEvents.mockResolvedValueOnce(makeGhResponse(new Date().toISOString()));
-        getClosedIssuesInWindow.mockResolvedValueOnce([{
-            id: 4001,
-            number: 42,
-            closed_at: subMinutes(new Date(), 60).toISOString(),
-            closed_by: { id: 7, login: 'zloyden' },
-            labels: [],
-        }]);
-        // eslint-disable-next-line global-require
-        const fsUtils = require('../../src/tools/fs-utils');
-        const merge = jest.spyOn(fsUtils, 'mergeSyntheticEventsIntoCollection')
-            .mockRejectedValueOnce(new Error('disk full'));
+        getGithubEvents.mockResolvedValueOnce(makeGhResponse(now));
+        const dayFile = path.join(dir, `${today}.jsonl`);
+        getClosedIssuesInWindow.mockImplementationOnce(async () => {
+            // The poll has already stored today's events. Keep the day file
+            // readable but not writable, so the merge hits a real EACCES from
+            // the write stream instead of a stubbed rejection.
+            await chmod(dayFile, 0o444);
+            return [{
+                id: 4001,
+                number: 42,
+                closed_at: now,
+                closed_by: { id: 7, login: 'zloyden' },
+                labels: [],
+            }];
+        });
         const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
 
         try {
@@ -662,11 +670,11 @@ describe('pollEvents — gap detection', () => {
             // The poll still succeeds, records the failure as the retry
             // reason, and keeps the reconciliation error in the diagnostics.
             expect(result.success).toBe(true);
-            expect(records[1].backfillError).toContain('disk full');
-            expect(warn).toHaveBeenCalledWith(expect.stringContaining('disk full'));
+            expect(records[1].backfillError).toContain('EACCES');
+            expect(warn).toHaveBeenCalledWith(expect.stringContaining('EACCES'));
             expect(warn.mock.calls.flat().join(' ')).toContain('The next poll retries');
         } finally {
-            merge.mockRestore();
+            await chmod(dayFile, 0o644);
             warn.mockRestore();
         }
     });
