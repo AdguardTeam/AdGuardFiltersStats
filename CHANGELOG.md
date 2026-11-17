@@ -15,8 +15,13 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
   slow REST backfill cannot overrun the poll step timeout and the collected
   events are still committed. A failed backfill and a backfill that stops at
   the time budget do not count as the last successful poll, so the next poll
-  retries them. A page-limit truncation is recorded but not retried. Each
-  page is logged, and the poll metadata records `backfillTruncated`,
+  retries them. The last successful poll is now read from the current and
+  the previous day metadata sidecar, so a gap that crosses midnight is
+  detected and a failed backfill from the previous day is retried. A poll
+  that finds no successful record in either sidecar warns instead of
+  skipping the gap silently. A
+  page-limit truncation is recorded but not retried. Each page is logged,
+  and the poll metadata records `backfillTruncated`,
   `backfillBudgetExceeded`, and `backfillError`.
 - A retried backfill no longer stores a synthetic event when the same
   activity is already present in the collection as a live event.

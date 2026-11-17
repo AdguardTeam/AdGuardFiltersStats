@@ -43,6 +43,26 @@ const makeGhResponse = (eventTime) => ({
     },
 });
 
+const makeMetadataRecord = (overrides = {}) => ({
+    timestamp: new Date().toISOString(),
+    totalEvents: 5,
+    pagesCollected: 1,
+    eventsInFile: 5,
+    rateLimitRemaining: 4995,
+    rateLimitReached: false,
+    rateLimitReset: null,
+    oldestEventAt: null,
+    newestEventAt: null,
+    gapSuspected: false,
+    backfillTruncated: false,
+    backfillBudgetExceeded: false,
+    backfillError: null,
+    error: null,
+    collectionPath: '',
+    repo: 'a/b',
+    ...overrides,
+});
+
 const readStoredEvents = async (dir) => {
     const files = (await readdir(dir)).filter((name) => name.endsWith('.jsonl'));
     const contents = await Promise.all(
@@ -677,5 +697,220 @@ describe('pollEvents — gap detection', () => {
             await chmod(dayFile, 0o644);
             warn.mockRestore();
         }
+    });
+
+    describe('cross-midnight gap detection', () => {
+        // The clock is frozen at a local time: the code and date-fns both use
+        // the local day, so the sidecar names are the same in every timezone.
+        const freezeClock = (localTime) => {
+            jest.useFakeTimers();
+            jest.setSystemTime(new Date(localTime));
+        };
+
+        const writeSidecar = async (day, records) => {
+            await writeFile(
+                path.join(dir, `${day}-metadata.json`),
+                JSON.stringify(records),
+            );
+        };
+
+        const readTodayRecords = async () => {
+            const today = format(new Date(), 'yyyy-MM-dd');
+            return JSON.parse(
+                await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
+            );
+        };
+
+        beforeEach(() => {
+            jest.clearAllMocks();
+        });
+
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
+        it("detects a gap from the previous day's last successful poll", async () => {
+            freezeClock('2026-11-16T02:00:00');
+            const previousRecord = makeMetadataRecord({
+                timestamp: '2026-11-15T23:30:00',
+                oldestEventAt: '2026-11-15T23:20:00.000Z',
+                newestEventAt: '2026-11-15T23:25:00.000Z',
+            });
+            await writeSidecar('2026-11-15', [previousRecord]);
+            getGithubEvents.mockResolvedValueOnce(makeGhResponse('2026-11-16T01:55:00.000Z'));
+
+            await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+            const records = await readTodayRecords();
+            // The first poll of the day must measure the gap from the previous
+            // day's last successful poll instead of ignoring it.
+            expect(records).toHaveLength(1);
+            expect(records[0].gapSuspected).toBe(true);
+            expect(getClosedIssuesInWindow).toHaveBeenLastCalledWith(
+                { owner: 'a', repo: 'b' },
+                {
+                    since: previousRecord.newestEventAt,
+                    until: '2026-11-16T01:55:00.000Z',
+                },
+                expect.any(Object),
+            );
+        });
+
+        it('does not report a gap when the previous day poll is recent', async () => {
+            freezeClock('2026-11-16T00:10:00');
+            await writeSidecar('2026-11-15', [
+                makeMetadataRecord({
+                    timestamp: '2026-11-15T23:30:00',
+                    newestEventAt: '2026-11-15T23:25:00.000Z',
+                }),
+            ]);
+            getGithubEvents.mockResolvedValueOnce(makeGhResponse('2026-11-16T00:05:00.000Z'));
+
+            await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+            const records = await readTodayRecords();
+            expect(records[0].gapSuspected).toBe(false);
+            expect(getClosedIssuesInWindow).not.toHaveBeenCalled();
+        });
+
+        it('retries a failed backfill recorded before midnight', async () => {
+            freezeClock('2026-11-16T01:30:00');
+            const successfulRecord = makeMetadataRecord({
+                timestamp: '2026-11-15T22:30:00',
+                newestEventAt: '2026-11-15T22:25:00.000Z',
+            });
+            const failedRecord = makeMetadataRecord({
+                timestamp: '2026-11-15T23:30:00',
+                newestEventAt: '2026-11-15T23:25:00.000Z',
+                gapSuspected: true,
+                backfillError: 'issues rate limit',
+            });
+            await writeSidecar('2026-11-15', [successfulRecord, failedRecord]);
+            getGithubEvents.mockResolvedValueOnce(makeGhResponse('2026-11-16T01:25:00.000Z'));
+
+            await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+            const records = await readTodayRecords();
+            // The failed backfill must not move the window forward, even after
+            // midnight: the retried window starts at the last successful poll.
+            expect(records[0].gapSuspected).toBe(true);
+            expect(getClosedIssuesInWindow).toHaveBeenLastCalledWith(
+                { owner: 'a', repo: 'b' },
+                {
+                    since: successfulRecord.newestEventAt,
+                    until: '2026-11-16T01:25:00.000Z',
+                },
+                expect.any(Object),
+            );
+        });
+
+        it('retries a budget-stopped backfill recorded before midnight', async () => {
+            freezeClock('2026-11-16T02:00:00');
+            const successfulRecord = makeMetadataRecord({
+                timestamp: '2026-11-15T21:00:00',
+                newestEventAt: '2026-11-15T20:55:00.000Z',
+            });
+            const stoppedRecord = makeMetadataRecord({
+                timestamp: '2026-11-15T23:40:00',
+                newestEventAt: '2026-11-15T23:35:00.000Z',
+                gapSuspected: true,
+                backfillTruncated: true,
+                backfillBudgetExceeded: true,
+            });
+            await writeSidecar('2026-11-15', [successfulRecord, stoppedRecord]);
+            getGithubEvents.mockResolvedValueOnce(makeGhResponse('2026-11-16T01:55:00.000Z'));
+
+            await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+            const records = await readTodayRecords();
+            expect(records[0].gapSuspected).toBe(true);
+            expect(getClosedIssuesInWindow).toHaveBeenLastCalledWith(
+                { owner: 'a', repo: 'b' },
+                {
+                    since: successfulRecord.newestEventAt,
+                    until: '2026-11-16T01:55:00.000Z',
+                },
+                expect.any(Object),
+            );
+        });
+
+        it('does not read metadata older than the previous day', async () => {
+            freezeClock('2026-11-16T02:00:00');
+            await writeSidecar('2026-11-14', [
+                makeMetadataRecord({
+                    timestamp: '2026-11-14T20:00:00',
+                    newestEventAt: '2026-11-14T19:55:00.000Z',
+                }),
+            ]);
+            getGithubEvents.mockResolvedValueOnce(makeGhResponse('2026-11-16T01:55:00.000Z'));
+            const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+
+            try {
+                await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+                // The read is bounded to two sidecars: an older sidecar must
+                // not become the baseline, and the skipped gap must be visible.
+                const records = await readTodayRecords();
+                expect(records[0].gapSuspected).toBe(false);
+                expect(getClosedIssuesInWindow).not.toHaveBeenCalled();
+                expect(warn.mock.calls.flat().join(' ')).toContain('No successful poll');
+            } finally {
+                warn.mockRestore();
+            }
+        });
+
+        it("prefers today's last successful poll over the previous day's", async () => {
+            freezeClock('2026-11-16T01:00:00');
+            await writeSidecar('2026-11-15', [
+                makeMetadataRecord({
+                    timestamp: '2026-11-15T22:00:00',
+                    newestEventAt: '2026-11-15T21:55:00.000Z',
+                }),
+            ]);
+            await writeSidecar('2026-11-16', [
+                makeMetadataRecord({
+                    timestamp: '2026-11-16T00:20:00',
+                    newestEventAt: '2026-11-16T00:15:00.000Z',
+                }),
+            ]);
+            getGithubEvents.mockResolvedValueOnce(makeGhResponse('2026-11-16T00:50:00.000Z'));
+
+            await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+            // The newer record of the current day must win. An inverted
+            // concatenation would measure three hours since the previous day's
+            // poll and backfill a window that is already covered.
+            const records = await readTodayRecords();
+            expect(records).toHaveLength(2);
+            expect(records.at(-1).gapSuspected).toBe(false);
+            expect(getClosedIssuesInWindow).not.toHaveBeenCalled();
+        });
+
+        it('reports a gap from the time since the last poll alone', async () => {
+            freezeClock('2026-11-16T01:30:00');
+            const eventTime = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+            const previousNewestEventAt = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+            await writeSidecar('2026-11-15', [
+                makeMetadataRecord({
+                    // The previous successful poll ran 150 minutes ago, while
+                    // its newest event is only 10 minutes before this batch.
+                    // The event window is tight, so only the time since the
+                    // last poll can show the gap.
+                    timestamp: new Date(Date.now() - 150 * 60 * 1000).toISOString(),
+                    newestEventAt: previousNewestEventAt,
+                }),
+            ]);
+            getGithubEvents.mockResolvedValueOnce(makeGhResponse(eventTime));
+
+            await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+            const records = await readTodayRecords();
+            expect(records[0].gapSuspected).toBe(true);
+            expect(getClosedIssuesInWindow).toHaveBeenLastCalledWith(
+                { owner: 'a', repo: 'b' },
+                { since: previousNewestEventAt, until: eventTime },
+                expect.any(Object),
+            );
+        });
     });
 });
