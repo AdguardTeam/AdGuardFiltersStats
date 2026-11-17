@@ -17,7 +17,9 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
   the time budget do not count as the last successful poll, so the next poll
   retries them. The last successful poll is now read from the current and
   the previous day metadata sidecar, so a gap that crosses midnight is
-  detected and a failed backfill from the previous day is retried. A
+  detected and a failed backfill from the previous day is retried. A poll
+  that finds no successful record in either sidecar warns instead of
+  skipping the gap silently. A
   page-limit truncation is recorded but not retried. Each page is logged,
   and the poll metadata records `backfillTruncated`,
   `backfillBudgetExceeded`, and `backfillError`.

@@ -843,14 +843,20 @@ describe('pollEvents — gap detection', () => {
                 }),
             ]);
             getGithubEvents.mockResolvedValueOnce(makeGhResponse('2026-11-16T01:55:00.000Z'));
+            const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
 
-            await pollEvents(dir, { owner: 'a', repo: 'b' });
+            try {
+                await pollEvents(dir, { owner: 'a', repo: 'b' });
 
-            // The read is bounded to two sidecars: an older sidecar must not
-            // become the baseline.
-            const records = await readTodayRecords();
-            expect(records[0].gapSuspected).toBe(false);
-            expect(getClosedIssuesInWindow).not.toHaveBeenCalled();
+                // The read is bounded to two sidecars: an older sidecar must
+                // not become the baseline, and the skipped gap must be visible.
+                const records = await readTodayRecords();
+                expect(records[0].gapSuspected).toBe(false);
+                expect(getClosedIssuesInWindow).not.toHaveBeenCalled();
+                expect(warn.mock.calls.flat().join(' ')).toContain('No successful poll');
+            } finally {
+                warn.mockRestore();
+            }
         });
 
         it("prefers today's last successful poll over the previous day's", async () => {

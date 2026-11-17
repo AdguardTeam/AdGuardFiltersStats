@@ -179,7 +179,8 @@ of the current day and of the previous day only. A gap that crosses
 midnight is therefore detected, and a failed or budget-stopped backfill
 from the previous day is retried after midnight. No older sidecar is read,
 so a retry stops when the failed poll is two days old, and a poll outage
-longer than one day is not detected.
+longer than one day is not detected. `github-poll` warns when neither
+sidecar has a successful poll, so a skipped window is visible in the log.
 
 #### Metadata fields
 

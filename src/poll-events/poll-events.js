@@ -81,6 +81,12 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
         const lastSuccessful = [...previousRecords, ...todayRecords]
             .filter((record) => !record.error && !record.backfillError && !record.backfillBudgetExceeded)
             .at(-1);
+        if (!lastSuccessful) {
+            logger.warn(
+                '⚠️ No successful poll in the current and previous day metadata. '
+                + 'Gap detection is skipped.',
+            );
+        }
 
         let gapSuspected = false;
         let gapWindowSince = null;
