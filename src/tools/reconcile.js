@@ -1,4 +1,5 @@
 import { getClosedIssuesInWindow, getPullsInWindow } from './gh-utils';
+import { normalizeErrorMessage } from './error-utils';
 import { RECONCILE_BUDGET_MS } from '../constants';
 
 /**
@@ -180,7 +181,7 @@ export const reconcileWindow = async (
         .filter((r) => r.status === 'fulfilled').length;
     const errors = [issuesResult, pullsResult]
         .filter((r) => r.status === 'rejected')
-        .map((r) => r.reason.message);
+        .map((r) => normalizeErrorMessage(r.reason));
     const error = errors.length > 0 ? errors.join('; ') : null;
     return {
         injectedEvents: buildSyntheticEvents({
@@ -190,6 +191,8 @@ export const reconcileWindow = async (
         endpointsSucceeded,
         truncated: budget.truncated,
         budgetExceeded: budget.budgetExceeded,
+        // Each reason is already one bounded line. Truncating the joined text
+        // would cut the reason of the second walk, so the parts are kept.
         error,
     };
 };

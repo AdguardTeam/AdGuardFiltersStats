@@ -189,6 +189,132 @@ describe('pollEvents — gap detection', () => {
         expect(records[1].gapSuspected).toBe(true);
     });
 
+    it('falls back to the record timestamp when newestEventAt is invalid', async () => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const twoHoursAgo = subMinutes(new Date(), 120).toISOString();
+        const eventTime = subMinutes(new Date(), 30).toISOString();
+        const invalidRecord = {
+            timestamp: twoHoursAgo,
+            totalEvents: 5,
+            pagesCollected: 1,
+            eventsInFile: 5,
+            rateLimitRemaining: 4995,
+            rateLimitReached: false,
+            rateLimitReset: null,
+            oldestEventAt: subMinutes(new Date(), 130).toISOString(),
+            newestEventAt: 'not-a-date',
+            gapSuspected: false,
+            error: null,
+            collectionPath: dir,
+            repo: 'a/b',
+        };
+        await writeFile(
+            path.join(dir, `${today}-metadata.json`),
+            JSON.stringify([invalidRecord]),
+        );
+        getGithubEvents.mockResolvedValueOnce(makeGhResponse(eventTime));
+        const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+
+        try {
+            await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+            expect(warn).toHaveBeenCalledWith(
+                expect.stringContaining('invalid newestEventAt'),
+            );
+        } finally {
+            warn.mockRestore();
+        }
+
+        // An invalid value is no window baseline, so a suspected gap would end
+        // in an unreadable comparison and no backfill. The record timestamp
+        // must take its place.
+        expect(getClosedIssuesInWindow).toHaveBeenLastCalledWith(
+            { owner: 'a', repo: 'b' },
+            { since: invalidRecord.timestamp, until: eventTime },
+            expect.any(Object),
+        );
+    });
+
+    it('falls back to newestEventAt when the record timestamp is invalid', async () => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const twoHoursAgo = subMinutes(new Date(), 120).toISOString();
+        const eventTime = subMinutes(new Date(), 30).toISOString();
+        const invalidRecord = {
+            timestamp: 'not-a-date',
+            totalEvents: 5,
+            pagesCollected: 1,
+            eventsInFile: 5,
+            rateLimitRemaining: 4995,
+            rateLimitReached: false,
+            rateLimitReset: null,
+            oldestEventAt: subMinutes(new Date(), 130).toISOString(),
+            newestEventAt: twoHoursAgo,
+            gapSuspected: false,
+            error: null,
+            collectionPath: dir,
+            repo: 'a/b',
+        };
+        await writeFile(
+            path.join(dir, `${today}-metadata.json`),
+            JSON.stringify([invalidRecord]),
+        );
+        getGithubEvents.mockResolvedValueOnce(makeGhResponse(eventTime));
+        const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+
+        try {
+            await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+            expect(warn).toHaveBeenCalledWith(
+                expect.stringContaining('invalid timestamp'),
+            );
+        } finally {
+            warn.mockRestore();
+        }
+
+        // An unreadable timestamp would make the time-based check NaN and hide
+        // the gap, so the newest event of that poll must date it instead.
+        expect(getClosedIssuesInWindow).toHaveBeenLastCalledWith(
+            { owner: 'a', repo: 'b' },
+            { since: twoHoursAgo, until: eventTime },
+            expect.any(Object),
+        );
+    });
+
+    it('warns when the last successful poll has no usable timestamp', async () => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const invalidRecord = {
+            timestamp: 'not-a-date',
+            totalEvents: 5,
+            pagesCollected: 1,
+            eventsInFile: 5,
+            rateLimitRemaining: 4995,
+            rateLimitReached: false,
+            rateLimitReset: null,
+            oldestEventAt: null,
+            newestEventAt: 'also-not-a-date',
+            gapSuspected: false,
+            error: null,
+            collectionPath: dir,
+            repo: 'a/b',
+        };
+        await writeFile(
+            path.join(dir, `${today}-metadata.json`),
+            JSON.stringify([invalidRecord]),
+        );
+        getGithubEvents.mockResolvedValueOnce(makeGhResponse(new Date().toISOString()));
+        const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+
+        try {
+            await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+            expect(warn).toHaveBeenCalledWith(
+                expect.stringContaining('invalid newestEventAt and timestamp'),
+            );
+        } finally {
+            warn.mockRestore();
+        }
+    });
+
     it('does not backfill an equal-bounds window', async () => {
         const today = format(new Date(), 'yyyy-MM-dd');
         const eventTime = new Date().toISOString();
@@ -695,6 +821,48 @@ describe('pollEvents — gap detection', () => {
             expect(warn.mock.calls.flat().join(' ')).toContain('The next poll retries');
         } finally {
             await chmod(dayFile, 0o644);
+            warn.mockRestore();
+        }
+    });
+
+    it('stores a multi-line backfill error on one line', async () => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const oldRecord = {
+            timestamp: subMinutes(new Date(), 120).toISOString(),
+            totalEvents: 5,
+            pagesCollected: 1,
+            eventsInFile: 5,
+            rateLimitRemaining: 4995,
+            rateLimitReached: false,
+            rateLimitReset: null,
+            oldestEventAt: subMinutes(new Date(), 130).toISOString(),
+            newestEventAt: subMinutes(new Date(), 121).toISOString(),
+            gapSuspected: false,
+            error: null,
+            collectionPath: dir,
+            repo: 'a/b',
+        };
+        await writeFile(
+            path.join(dir, `${today}-metadata.json`),
+            JSON.stringify([oldRecord]),
+        );
+        getGithubEvents.mockResolvedValueOnce(makeGhResponse(new Date().toISOString()));
+        getClosedIssuesInWindow.mockRejectedValueOnce(
+            new Error('issues failed\nwith a body:\n<html>'),
+        );
+        const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+
+        try {
+            await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+            const records = JSON.parse(
+                await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
+            );
+            expect(records[1].backfillError).toBe('issues failed with a body: <html>');
+            expect(warn).toHaveBeenCalledWith(
+                expect.stringContaining('issues failed with a body: <html>'),
+            );
+        } finally {
             warn.mockRestore();
         }
     });

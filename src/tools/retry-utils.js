@@ -1,4 +1,5 @@
 import { logger } from './logger';
+import { normalizeErrorMessage } from './error-utils';
 
 /**
  * Maximum number of retries after the first failed attempt.
@@ -122,8 +123,8 @@ export const withRetry = async (request, { retries = DEFAULT_RETRIES, label = 'R
             const status = typeof error?.status === 'number' ? error.status : 'no status';
 
             logger.warn(
-                `${label} failed (attempt ${attempt} of ${attemptsLimit}, ${status}): ${error.message}. `
-                + `Retrying in ${delay} ms.`,
+                `${label} failed (attempt ${attempt} of ${attemptsLimit}, ${status}): `
+                + `${normalizeErrorMessage(error)}. Retrying in ${delay} ms.`,
             );
 
             await sleep(delay);

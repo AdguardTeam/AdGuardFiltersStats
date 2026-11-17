@@ -4,6 +4,7 @@ import { getGithubEvents } from '../tools/gh-utils';
 import { reconcileWindow } from '../tools/reconcile';
 import { EVENT_EXPIRATION_DAYS, POLL_GAP_THRESHOLD_MS } from '../constants';
 import { logger } from '../tools/logger';
+import { normalizeErrorMessage } from '../tools/error-utils';
 import {
     removeOldFilesFromCollection,
     writePollToCollection,
@@ -25,6 +26,22 @@ const getMetadataPath = (collectionPath, date) => {
     const day = format(date, 'yyyy-MM-dd');
     return path.join(collectionPath, `${day}-metadata.json`);
 };
+
+/**
+ * Report whether a value converts to a usable timestamp.
+ *
+ * The metadata is read back from the collection, so a hand-edited or
+ * truncated record can hold a value that `new Date()` cannot parse. Such a
+ * value turns every comparison into `NaN`, and a `NaN` comparison is false,
+ * so the gap would be skipped without a message.
+ *
+ * @param {unknown} value Value to check.
+ *
+ * @returns {boolean} `true` when the value converts to a finite epoch time.
+ */
+const isValidTimestamp = (value) => typeof value === 'string'
+    && value.length > 0
+    && Number.isFinite(new Date(value).getTime());
 
 /**
  * Polls events from Github Events API and stores them on a given path.
@@ -65,7 +82,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
         const metadataPath = getMetadataPath(collectionPath, now);
         const previousMetadataPath = getMetadataPath(collectionPath, subDays(now, 1));
         const previousRecords = await readMetadataRecords(previousMetadataPath).catch((error) => {
-            logger.warn(`⚠️ Cannot read ${previousMetadataPath}: ${error.message}`);
+            logger.warn(`⚠️ Cannot read ${previousMetadataPath}: ${normalizeErrorMessage(error)}`);
             return [];
         });
         const todayRecords = await readMetadataRecords(metadataPath);
@@ -94,14 +111,46 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
         let backfillBudgetExceeded = false;
         let backfillError = null;
         if (lastSuccessful) {
-            const msSinceLast = Date.now() - new Date(lastSuccessful.timestamp).getTime();
-            const oldestEventTime = new Date(oldestEventAt).getTime();
-            const lastEventTime = new Date(lastSuccessful.newestEventAt).getTime();
-            const eventBasedGap = lastSuccessful.newestEventAt
-                && (oldestEventTime - lastEventTime) > POLL_GAP_THRESHOLD_MS;
-            if (msSinceLast > POLL_GAP_THRESHOLD_MS || eventBasedGap) {
-                gapSuspected = true;
-                gapWindowSince = lastSuccessful.newestEventAt || lastSuccessful.timestamp;
+            // A record can hold a value that `new Date()` cannot parse, and a
+            // comparison with such a value is `NaN`, which is false. The gap
+            // would then be skipped without a message. Each field can date the
+            // gap, so an unreadable one falls back to the other, and the
+            // replacement is reported.
+            const hasEventTimestamp = isValidTimestamp(lastSuccessful.newestEventAt);
+            const hasPollTimestamp = isValidTimestamp(lastSuccessful.timestamp);
+            if (!hasEventTimestamp && !hasPollTimestamp) {
+                logger.warn(
+                    '⚠️ Last successful poll has an invalid newestEventAt and timestamp. '
+                    + 'The gap check is skipped.',
+                );
+            } else if (!hasEventTimestamp) {
+                const invalidValue = normalizeErrorMessage(lastSuccessful.newestEventAt);
+                logger.warn(
+                    `⚠️ Last successful poll has an invalid newestEventAt (${invalidValue || 'missing'}). `
+                    + 'The gap is measured from its timestamp.',
+                );
+            } else if (!hasPollTimestamp) {
+                const invalidValue = normalizeErrorMessage(lastSuccessful.timestamp);
+                logger.warn(
+                    `⚠️ Last successful poll has an invalid timestamp (${invalidValue || 'missing'}). `
+                    + 'The gap is measured from its newestEventAt.',
+                );
+            }
+            if (hasEventTimestamp || hasPollTimestamp) {
+                const baselineEventAt = hasEventTimestamp
+                    ? lastSuccessful.newestEventAt
+                    : lastSuccessful.timestamp;
+                const baselinePollAt = hasPollTimestamp
+                    ? lastSuccessful.timestamp
+                    : lastSuccessful.newestEventAt;
+                const msSinceLast = Date.now() - new Date(baselinePollAt).getTime();
+                const oldestEventTime = new Date(oldestEventAt).getTime();
+                const baselineTime = new Date(baselineEventAt).getTime();
+                const eventBasedGap = (oldestEventTime - baselineTime) > POLL_GAP_THRESHOLD_MS;
+                if (msSinceLast > POLL_GAP_THRESHOLD_MS || eventBasedGap) {
+                    gapSuspected = true;
+                    gapWindowSince = baselineEventAt;
+                }
             }
         }
 
@@ -136,7 +185,12 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
                 try {
                     await mergeSyntheticEventsIntoCollection(collectionPath, injectedEvents);
                 } catch (mergeError) {
-                    const mergeMessage = `failed to store the recovered events: ${mergeError.message}`;
+                    const mergeMessage = normalizeErrorMessage(
+                        `failed to store the recovered events: ${mergeError}`,
+                    );
+                    // Each reason is one bounded line. Truncating the joined
+                    // text would cut the write failure that just happened, so
+                    // the parts are kept as they are.
                     backfillError = backfillError
                         ? `${backfillError}; ${mergeMessage}`
                         : mergeMessage;
@@ -186,6 +240,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
             },
         };
     } catch (error) {
+        const message = normalizeErrorMessage(error);
         const rateLimitReached = error?.rateLimitReached === true;
         const rateLimitReset = error?.rateLimitReset ?? null;
         try {
@@ -205,23 +260,23 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
                     backfillTruncated: false,
                     backfillBudgetExceeded: false,
                     backfillError: null,
-                    error: error.message,
+                    error: message,
                     collectionPath,
                     repo: `${commonRequestData.owner}/${commonRequestData.repo}`,
                 },
             );
         } catch (metaErr) {
             // Writing error metadata failed — log and continue so the original error is still reported.
-            logger.error('Failed to persist error metadata:', metaErr.message);
+            logger.error('Failed to persist error metadata:', normalizeErrorMessage(metaErr));
         }
-        logger.error('Error in pollEvents:', error.message);
+        logger.error('Error in pollEvents:', message);
         // Return failure status and error information
         return {
             success: false,
-            error: error.message,
+            error: message,
             metadata: {
                 timestamp: new Date().toISOString(),
-                error: error.message,
+                error: message,
                 rateLimitReached,
                 rateLimitReset,
             },

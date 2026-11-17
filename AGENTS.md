@@ -102,7 +102,7 @@ It is intended to be invoked from CI (e.g. GitHub Actions — see
 │   ├── publish-stats/            # Slack publishing orchestration
 │   ├── publish-utils/            # Slack client + Block Kit formatters
 │   │   └── format-utils/         # Block Kit builders, pruning
-│   └── tools/                    # Shared helpers (fs, gh, streams, print)
+│   └── tools/                    # Shared helpers (fs, gh, streams, print, errors)
 ├── tests/                        # Jest tests mirroring src/ layout
 │   ├── publish-utils/            # Tests for Slack block formatters
 │   └── test-files/               # Fixtures
@@ -322,12 +322,28 @@ conventions not covered by the linter.
   events, merging synthetic events MUST skip an event whose activity key
   is already stored. The activity key MUST identify one occurrence, not
   only the issue or pull request: an issue that is reopened and closed
-  again counts as two closures.
+  again counts as two closures. A timeout MUST be detected from the request
+  error, not from `signal.aborted` alone: a real API error can reject in the
+  same turn the timer fires, and it must keep its own message and its own
+  status. Only a failure that the abort caused sets `timedOut`, and only a
+  `timedOut` failure of a budget-capped request is a budget stop. A
+  timestamp read back from metadata MUST be validated before a comparison:
+  an unreadable value turns the comparison into `NaN`, which is false, so
+  the check would pass without a message. Fall back to the other timestamp
+  of the record and warn. A timeout MUST NOT be detected from a message
+  alone: a failure that carries a response is an HTTP error, not an abort.
 - **Logging**: Use `console.log` for progress, `console.warn` for
   recoverable issues (rate-limit warnings, missing optional data), and
   `console.error` for fatal errors. Disable the `no-console` ESLint rule
   inline (`// eslint-disable-next-line no-console`) at each call site, as
-  done elsewhere in the codebase.
+  done elsewhere in the codebase. An error message that reaches a log line
+  or a metadata record MUST go through `normalizeErrorMessage` from
+  [src/tools/error-utils.js](./src/tools/error-utils.js): it collapses
+  whitespace to one line and bounds the length. A field that joins several
+  reasons MUST bound each reason, not the joined text: a second pass over
+  the joined string cuts the reason it holds at the end. The metadata is
+  committed, so a raw multi-line API response would break a log line and
+  bloat the record.
 - **Naming**: Files and directories use `kebab-case`
   (`prepare-contributors-stat.js`). Exported identifiers use
   `camelCase` for functions/values and `PascalCase` for classes (e.g.

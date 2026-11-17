@@ -8,6 +8,7 @@ import { getCommitsInWindow } from '../tools/gh-utils';
 import { buildCommitEvents } from '../tools/commit-events';
 import { getActivityKey } from '../tools/events-utils';
 import { logger } from '../tools/logger';
+import { normalizeErrorMessage } from '../tools/error-utils';
 import { EVENT_TYPES } from '../constants';
 
 const dedupeById = (events) => {
@@ -47,9 +48,8 @@ const fetchCommitEvents = async (commonRequestData, timePeriod, repoMeta) => {
         commits = await getCommitsInWindow(commonRequestData, timePeriod);
     } catch (error) {
         logger.warn(
-            `⚠️ Failed to fetch commits for the reporting window: ${error.message}.`
+            `⚠️ Failed to fetch commits for the reporting window: ${normalizeErrorMessage(error)}.`
             + ' Falling back to PushEvent counts; commit statistics may be incomplete.',
-            error,
         );
         return null;
     }
@@ -113,7 +113,7 @@ export const prepareStats = async (collectionPath, commonRequestData, timePeriod
                 await mergeSyntheticEventsIntoCollection(collectionPath, injectedEvents);
             } catch (mergeError) {
                 logger.warn(
-                    `⚠️ Failed to store the recovered events: ${mergeError.message}.`
+                    `⚠️ Failed to store the recovered events: ${normalizeErrorMessage(mergeError)}.`
                     + ' The report still uses them; the next run fetches them again.',
                 );
             }

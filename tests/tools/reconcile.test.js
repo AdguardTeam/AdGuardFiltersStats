@@ -254,6 +254,25 @@ describe('reconcileWindow', () => {
         expect(result.error).toContain('pulls fail');
     });
 
+    it('keeps the combined error on one line', async () => {
+        getClosedIssuesInWindow.mockRejectedValueOnce(new Error('issues\nfail'));
+        getPullsInWindow.mockRejectedValueOnce(new Error('pulls\nfail'));
+        const result = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
+        expect(result.error).toBe('issues fail; pulls fail');
+    });
+
+    it('keeps both reasons when each one is long', async () => {
+        getClosedIssuesInWindow.mockRejectedValueOnce(new Error(`issues ${'a'.repeat(400)}`));
+        getPullsInWindow.mockRejectedValueOnce(new Error(`pulls ${'b'.repeat(400)}`));
+
+        const result = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
+
+        // Bounding each reason must not cut the reason of the second walk.
+        expect(result.error).toContain('issues aaa');
+        expect(result.error).toContain('pulls bbb');
+        expect(result.error).not.toContain('\n');
+    });
+
     it('gives both walks the same budget and reports no truncation', async () => {
         const budgets = [];
         getClosedIssuesInWindow.mockImplementationOnce(async (c, t, { budget }) => {

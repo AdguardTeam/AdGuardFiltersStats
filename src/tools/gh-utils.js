@@ -2,6 +2,7 @@ import { Octokit } from '@octokit/core';
 import { isBefore, isWithinInterval } from 'date-fns';
 import { ENDPOINTS, MAX_NUMBER_OF_MOST_RECENT_EVENTS } from '../constants';
 import { logger } from './logger';
+import { normalizeErrorMessage } from './error-utils';
 import {
     RETRY_AFTER_HEADER,
     X_RATE_LIMIT_REMAINING_HEADER,
@@ -24,6 +25,57 @@ const REQUEST_TIMEOUT_MS = 30 * 1000;
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
 
 /**
+ * Error names that mark a request cancelled by an abort signal.
+ */
+const ABORT_ERROR_NAMES = ['AbortError', 'TimeoutError'];
+
+/**
+ * Message pattern of a request cancelled by an abort signal.
+ *
+ * `node-fetch` rejects an aborted request with `The user aborted a request.`
+ * and `@octokit/request` keeps only that message when it wraps the failure
+ * into a request error with status 500. The message is therefore the marker
+ * that survives the wrapping. The `code` property is not read: octokit
+ * defines it as a deprecated getter that returns the status and logs a
+ * deprecation warning.
+ */
+const ABORT_ERROR_MESSAGE = /\babort(?:ed)?\b/i;
+
+/**
+ * Report whether a failure is the artifact of an aborted request.
+ *
+ * The check reads the error, not the abort signal: a real API error can
+ * arrive in the same turn the timer fires, and the signal is then aborted
+ * without having caused that failure.
+ *
+ * A response rules the match out. An aborted request has no response, while
+ * every HTTP error carries one, so a server error whose body mentions an
+ * abort is not mistaken for a timeout.
+ *
+ * @param {unknown} error Error raised by a request.
+ * @param {number} [depth] Current cause-chain depth.
+ *
+ * @returns {boolean} `true` when the abort signal cancelled the request.
+ */
+const isAbortError = (error, depth = 0) => {
+    if (!error || typeof error !== 'object' || depth > 3) {
+        return false;
+    }
+
+    if (ABORT_ERROR_NAMES.includes(error.name) || error.type === 'aborted') {
+        return true;
+    }
+
+    if (!error.response
+        && typeof error.message === 'string'
+        && ABORT_ERROR_MESSAGE.test(error.message)) {
+        return true;
+    }
+
+    return isAbortError(error.cause, depth + 1);
+};
+
+/**
  * Perform a GitHub API request with a timeout that covers the whole attempt.
  *
  * The abort signal is created per call, so a retry gets a fresh timeout
@@ -40,7 +92,8 @@ const octokit = new Octokit({ auth: GITHUB_TOKEN });
  *
  * @throws {Error & {status?: number, timedOut?: boolean}} The request failure.
  * A request that the timeout aborted sets `timedOut` and fails with a message
- * that names the timeout.
+ * that names the timeout. A real API error that arrives when the timer fires
+ * keeps its own message and is not marked.
  */
 const requestWithTimeout = async (endpoint, params = {}, timeoutMs = REQUEST_TIMEOUT_MS) => {
     const signal = AbortSignal.timeout(timeoutMs);
@@ -54,7 +107,12 @@ const requestWithTimeout = async (endpoint, params = {}, timeoutMs = REQUEST_TIM
             },
         });
     } catch (error) {
-        if (!signal.aborted) {
+        // `signal.aborted` alone does not prove that the timeout cancelled
+        // this request: a real API error can reject in the same turn the timer
+        // fires. Overwriting that error would hide its status and message, and
+        // a budget-capped walk would report it as a budget stop. Classify the
+        // failure by the error itself.
+        if (!signal.aborted || !isAbortError(error)) {
             throw error;
         }
 
@@ -62,7 +120,7 @@ const requestWithTimeout = async (endpoint, params = {}, timeoutMs = REQUEST_TIM
         // request." and `@octokit/request` wraps it into an error with status
         // 500, so the retry warning and the final error do not say that our
         // own timeout fired. Keep the error object: it holds the status and
-        // the response, and `withRetry` still treats it as transient.
+        // the request, and `withRetry` still treats it as transient.
         error.message = `Request timed out after ${timeoutMs} ms`;
         error.timedOut = true;
 
@@ -202,7 +260,7 @@ export const getGithubEvents = async (commonRequestData = {}) => {
             throw rateLimitError;
         }
 
-        throw new Error(`Error fetching GitHub events: ${error.message}`);
+        throw new Error(`Error fetching GitHub events: ${normalizeErrorMessage(error)}`);
     }
 
     // Log information about the collection
