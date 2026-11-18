@@ -182,6 +182,14 @@ so a retry stops when the failed poll is two days old, and a poll outage
 longer than one day is not detected. `github-poll` warns when neither
 sidecar has a successful poll, so a skipped window is visible in the log.
 
+If the last successful record holds an unreadable `newestEventAt`, the poll
+measures the gap from the `timestamp` of that record, so the gap is still
+checked. An unreadable `timestamp` falls back to the `newestEventAt` of the
+record in the same way. The poll warns about each fallback, and warns that the
+gap check is skipped when neither value is readable. A backfill still starts
+only when the window is actually missing: a batch that overlaps the baseline
+needs none.
+
 #### Metadata fields
 
 The `YYYY-MM-DD-metadata.json` sidecar contains a JSON **array** of records, one per
@@ -204,6 +212,12 @@ on the next poll.)
 | `backfillBudgetExceeded` | `true` if the time budget, rather than the page limit, stopped a backfill                                                        |
 | `backfillError`          | Reconciliation error message if the backfill failed, otherwise `null`                                                            |
 | `error`                  | Error message if the poll failed, otherwise `null`                                                                               |
+
+The `backfillError` and `error` fields hold one line. A message that spans
+several lines is collapsed, and a message longer than 300 characters is cut.
+`backfillError` can hold more than one reason, separated by a semicolon and a
+space. A field is never empty: a failure without readable text is stored with
+its HTTP status, so the next poll still sees it as a failure.
 
 ### Print stats in console
 

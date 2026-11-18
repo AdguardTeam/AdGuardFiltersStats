@@ -253,18 +253,6 @@ const removeOldFilesFromCollection = async (path, expirationDays) => {
 };
 
 /**
- * Writes metadata to a JSON file.
- *
- * @param {string} path Path to the file.
- * @param {object} metadata Metadata to write.
- */
-const writeMetadataToFile = async (path, metadata) => {
-    await mkdir(path.substring(0, path.lastIndexOf('/')), { recursive: true });
-    const metadataJson = JSON.stringify(metadata, null, 2);
-    await writeFile(path, metadataJson);
-};
-
-/**
  * Read all metadata records from a per-day JSON file.
  * Returns an empty array if the file does not exist.
  * Migrates legacy single-object files to an array on read.
@@ -360,7 +348,6 @@ export {
     writePollToCollection,
     removeDupesFromCollection,
     removeOldFilesFromCollection,
-    writeMetadataToFile,
     appendMetadataRecord,
     mergeSyntheticEventsIntoCollection,
     readMetadataRecords,

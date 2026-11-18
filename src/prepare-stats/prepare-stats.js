@@ -8,6 +8,7 @@ import { getCommitsInWindow } from '../tools/gh-utils';
 import { buildCommitEvents } from '../tools/commit-events';
 import { getActivityKey } from '../tools/events-utils';
 import { logger } from '../tools/logger';
+import { describeError, normalizeErrorMessage } from '../tools/error-utils';
 import { EVENT_TYPES } from '../constants';
 
 const dedupeById = (events) => {
@@ -46,10 +47,15 @@ const fetchCommitEvents = async (commonRequestData, timePeriod, repoMeta) => {
     try {
         commits = await getCommitsInWindow(commonRequestData, timePeriod);
     } catch (error) {
+        // Keep the status next to the message, as the retry warning does: a
+        // 401 and a 503 are different problems with the same kind of text.
+        // `describeError` also names the failure when the response body is
+        // empty, instead of leaving the warning with no reason.
+        const status = typeof error?.status === 'number' ? error.status : 'no status';
         logger.warn(
-            `⚠️ Failed to fetch commits for the reporting window: ${error.message}.`
+            `⚠️ Failed to fetch commits for the reporting window (${status}): `
+            + `${describeError(error)}.`
             + ' Falling back to PushEvent counts; commit statistics may be incomplete.',
-            error,
         );
         return null;
     }
@@ -113,7 +119,7 @@ export const prepareStats = async (collectionPath, commonRequestData, timePeriod
                 await mergeSyntheticEventsIntoCollection(collectionPath, injectedEvents);
             } catch (mergeError) {
                 logger.warn(
-                    `⚠️ Failed to store the recovered events: ${mergeError.message}.`
+                    `⚠️ Failed to store the recovered events: ${normalizeErrorMessage(mergeError)}.`
                     + ' The report still uses them; the next run fetches them again.',
                 );
             }

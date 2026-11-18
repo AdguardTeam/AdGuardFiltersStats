@@ -159,4 +159,38 @@ describe('pollEvents — metadata is append-only', () => {
         expect(parsed[0].backfillError).toBeNull();
         expect(parsed[0].error).toBe(error.message);
     });
+
+    it('stores a failed poll error on one line', async () => {
+        getGithubEvents.mockRejectedValueOnce(new Error('Request failed\nwith a body:\n<html>'));
+
+        const dir = await mkdtemp(path.join(tmpdir(), 'poll-multiline-'));
+        const result = await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe('Request failed with a body: <html>');
+
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const parsed = JSON.parse(
+            await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
+        );
+        expect(parsed[0].error).toBe('Request failed with a body: <html>');
+    });
+
+    it('stores a non-empty reason when the failure text is empty', async () => {
+        // A record without a reason counts as a successful poll, so an empty
+        // text would hide the failure and skip the retry of the window.
+        getGithubEvents.mockRejectedValueOnce(Object.assign(new Error(' \r\n'), { status: 502 }));
+
+        const dir = await mkdtemp(path.join(tmpdir(), 'poll-empty-error-'));
+        const result = await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe('poll failed (502)');
+
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const parsed = JSON.parse(
+            await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
+        );
+        expect(parsed[0].error).toBe('poll failed (502)');
+    });
 });

@@ -171,6 +171,76 @@ describe('REST window walks — time budget', () => {
         expect(budget.budgetExceeded).toBe(false);
     });
 
+    it('keeps a REST error that lands when the timeout fires', async () => {
+        const base = Date.now();
+        const budget = { deadline: base + 5000, truncated: false, budgetExceeded: false };
+        jest.spyOn(Date, 'now')
+            .mockReturnValueOnce(base)
+            .mockReturnValue(base + 2000);
+        // The timer fires, so the signal is aborted, but the rejection below is
+        // a real API error in the shape octokit throws, not an abort artifact.
+        jest.spyOn(AbortSignal, 'timeout').mockReturnValue(AbortSignal.abort());
+        mockRequest.mockRejectedValue(Object.assign(new Error('Not Found'), {
+            name: 'HttpError',
+            status: 404,
+            response: { status: 404, headers: {}, data: {} },
+        }));
+
+        await expect(getClosedIssuesInWindow(commonRequestData, window, { budget }))
+            .rejects.toThrow('Not Found');
+        expect(budget.truncated).toBe(false);
+        expect(budget.budgetExceeded).toBe(false);
+    });
+
+    it('names the timeout for the wrapped error shape octokit throws', async () => {
+        const budget = { deadline: Date.now() + 60 * 1000, truncated: false, budgetExceeded: false };
+        jest.spyOn(AbortSignal, 'timeout').mockReturnValue(AbortSignal.abort());
+        // `@octokit/request` wraps an aborted request into a request error with
+        // status 500 and keeps only the message of the abort.
+        mockRequest.mockRejectedValue(Object.assign(
+            new Error('The user aborted a request.'),
+            { name: 'HttpError', status: 500 },
+        ));
+
+        await expect(getClosedIssuesInWindow(commonRequestData, window, { budget }))
+            .rejects.toThrow('Request timed out after 30000 ms');
+        expect(budget.truncated).toBe(false);
+        expect(budget.budgetExceeded).toBe(false);
+    });
+
+    it('does not treat a server error that mentions an abort as a timeout', async () => {
+        const base = Date.now();
+        const budget = { deadline: base + 5000, truncated: false, budgetExceeded: false };
+        jest.spyOn(Date, 'now')
+            .mockReturnValueOnce(base)
+            .mockReturnValue(base + 2000);
+        jest.spyOn(AbortSignal, 'timeout').mockReturnValue(AbortSignal.abort());
+        mockRequest.mockRejectedValue(Object.assign(
+            new Error('connection aborted, try again'),
+            { name: 'HttpError', status: 500, response: { status: 500, headers: {}, data: {} } },
+        ));
+
+        await expect(getClosedIssuesInWindow(commonRequestData, window, { budget }))
+            .rejects.toThrow('connection aborted, try again');
+        expect(budget.truncated).toBe(false);
+        expect(budget.budgetExceeded).toBe(false);
+    });
+
+    it('does not treat a response-less network failure as a timeout', async () => {
+        const budget = { deadline: Date.now() + 60 * 1000, truncated: false, budgetExceeded: false };
+        jest.spyOn(AbortSignal, 'timeout').mockReturnValue(AbortSignal.abort());
+        // A reset connection has no response either, and its text can mention an
+        // abort. Only the marker that `node-fetch` sets means a timeout.
+        mockRequest.mockRejectedValue(Object.assign(
+            new Error('connection aborted, try again'),
+            { name: 'HttpError', status: 500 },
+        ));
+
+        await expect(getClosedIssuesInWindow(commonRequestData, window, { budget }))
+            .rejects.toThrow('connection aborted, try again');
+        expect(budget.budgetExceeded).toBe(false);
+    });
+
     it('marks the walk truncated when the page safety limit is reached', async () => {
         const budget = { deadline: Date.now() + 60 * 1000, truncated: false, budgetExceeded: false };
         mockRequest.mockResolvedValue(buildIssuePage(100));

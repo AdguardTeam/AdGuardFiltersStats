@@ -213,7 +213,10 @@ describe('prepareStats — commit reconciliation', () => {
         const dir = await writeCollection([storedPush]);
         // eslint-disable-next-line global-require
         const gh = require('../../src/tools/gh-utils');
-        gh.getCommitsInWindow.mockRejectedValueOnce(new Error('rate limit'));
+        gh.getCommitsInWindow.mockRejectedValueOnce(
+            Object.assign(new Error('rate limit'), { status: 403 }),
+        );
+        const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
         const stats = await prepareStats(
             dir,
@@ -221,7 +224,37 @@ describe('prepareStats — commit reconciliation', () => {
             commitWindow,
         );
 
+        // The status stays next to the message, so a 401 and a 503 differ in the
+        // log.
+        expect(warn).toHaveBeenCalledWith(
+            expect.stringContaining('(403): rate limit'),
+        );
         expect(stats.activitiesByUser['Alex-302'].totalCommits).toBe(1);
+        warn.mockRestore();
+    });
+
+    it('names the status when the commits request fails without a body', async () => {
+        const dir = await writeCollection([storedPush]);
+        // eslint-disable-next-line global-require
+        const gh = require('../../src/tools/gh-utils');
+        gh.getCommitsInWindow.mockRejectedValueOnce(
+            Object.assign(new Error(' \r\n'), { status: 502 }),
+        );
+        const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+        const stats = await prepareStats(
+            dir,
+            { owner: 'AdguardTeam', repo: 'AdguardFilters' },
+            commitWindow,
+        );
+
+        // An empty body must not leave the warning with no reason after the
+        // colon; `describeError` names the status instead.
+        expect(warn).toHaveBeenCalledWith(
+            expect.stringContaining('(502): request failed (502)'),
+        );
+        expect(stats.activitiesByUser['Alex-302'].totalCommits).toBe(1);
+        warn.mockRestore();
     });
 
     it('warns when commits without a linked GitHub author are skipped', async () => {

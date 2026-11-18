@@ -2,6 +2,7 @@ import * as dotenv from 'dotenv';
 import { format } from 'date-fns';
 import { pollEvents } from './poll-events';
 import { MAX_NUMBER_OF_MOST_RECENT_EVENTS } from './constants';
+import { normalizeErrorMessage } from './tools/error-utils';
 
 dotenv.config();
 const { COLLECTION_PATH, REPO } = process.env;
@@ -70,7 +71,7 @@ const commonRequestData = {
         }
     } catch (error) {
         // eslint-disable-next-line no-console
-        console.error('❌ Unhandled error in GitHub polling script:', error.message);
+        console.error('❌ Unhandled error in GitHub polling script:', normalizeErrorMessage(error));
         process.exit(1);
     }
 })();
