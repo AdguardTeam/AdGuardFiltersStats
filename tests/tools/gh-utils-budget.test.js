@@ -226,6 +226,21 @@ describe('REST window walks — time budget', () => {
         expect(budget.budgetExceeded).toBe(false);
     });
 
+    it('does not treat a response-less network failure as a timeout', async () => {
+        const budget = { deadline: Date.now() + 60 * 1000, truncated: false, budgetExceeded: false };
+        jest.spyOn(AbortSignal, 'timeout').mockReturnValue(AbortSignal.abort());
+        // A reset connection has no response either, and its text can mention an
+        // abort. Only the marker that `node-fetch` sets means a timeout.
+        mockRequest.mockRejectedValue(Object.assign(
+            new Error('connection aborted, try again'),
+            { name: 'HttpError', status: 500 },
+        ));
+
+        await expect(getClosedIssuesInWindow(commonRequestData, window, { budget }))
+            .rejects.toThrow('connection aborted, try again');
+        expect(budget.budgetExceeded).toBe(false);
+    });
+
     it('marks the walk truncated when the page safety limit is reached', async () => {
         const budget = { deadline: Date.now() + 60 * 1000, truncated: false, budgetExceeded: false };
         mockRequest.mockResolvedValue(buildIssuePage(100));

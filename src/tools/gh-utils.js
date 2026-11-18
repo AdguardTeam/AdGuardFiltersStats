@@ -25,21 +25,16 @@ const REQUEST_TIMEOUT_MS = 30 * 1000;
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
 
 /**
- * Error names that mark a request cancelled by an abort signal.
- */
-const ABORT_ERROR_NAMES = ['AbortError', 'TimeoutError'];
-
-/**
- * Message pattern of a request cancelled by an abort signal.
+ * Message that `node-fetch` sets on a request that the abort signal cancelled.
  *
- * `node-fetch` rejects an aborted request with `The user aborted a request.`
- * and `@octokit/request` keeps only that message when it wraps the failure
- * into a request error with status 500. The message is therefore the marker
- * that survives the wrapping. The `code` property is not read: octokit
- * defines it as a deprecated getter that returns the status and logs a
- * deprecation warning.
+ * `node-fetch` 2.x rejects both a cancelled request and a cancelled response
+ * body with this exact message. `@octokit/request` 5.x rewraps every fetch
+ * failure as a request error with status 500 and no `response`, and keeps only
+ * the message, so the message is the marker that survives the wrapping. The
+ * `code` property is not read: octokit defines it as a deprecated getter that
+ * returns the status and logs a deprecation warning.
  */
-const ABORT_ERROR_MESSAGE = /\babort(?:ed)?\b/i;
+const ABORT_ERROR_MESSAGE = 'The user aborted a request.';
 
 /**
  * Report whether a failure is the artifact of an aborted request.
@@ -53,27 +48,10 @@ const ABORT_ERROR_MESSAGE = /\babort(?:ed)?\b/i;
  * abort is not mistaken for a timeout.
  *
  * @param {unknown} error Error raised by a request.
- * @param {number} [depth] Current cause-chain depth.
  *
  * @returns {boolean} `true` when the abort signal cancelled the request.
  */
-const isAbortError = (error, depth = 0) => {
-    if (!error || typeof error !== 'object' || depth > 3) {
-        return false;
-    }
-
-    if (ABORT_ERROR_NAMES.includes(error.name) || error.type === 'aborted') {
-        return true;
-    }
-
-    if (!error.response
-        && typeof error.message === 'string'
-        && ABORT_ERROR_MESSAGE.test(error.message)) {
-        return true;
-    }
-
-    return isAbortError(error.cause, depth + 1);
-};
+const isAbortError = (error) => !error?.response && error?.message === ABORT_ERROR_MESSAGE;
 
 /**
  * Perform a GitHub API request with a timeout that covers the whole attempt.
