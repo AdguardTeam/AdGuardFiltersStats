@@ -44,14 +44,16 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
   events they already hold.
 - `github-poll` now validates the `newestEventAt` and `timestamp` of the last
   successful poll before it compares them, and falls back to the other value
-  when one is unreadable, so an unreadable value no longer turns the comparison
-  false. The poll warns for each fallback, and warns that the gap check is
-  skipped when the record holds neither value. A backfill still starts only
-  when the window is missing.
+  when one is unreadable, so an unreadable value no longer disables the gap
+  check. The poll warns for each fallback, and warns that the gap check is
+  skipped when neither value is readable. A backfill still starts only when
+  the window is missing.
 - Stored poll metadata and the poll logs now hold each error reason on one
   line of at most 300 characters, so a multi-line API response can no longer
   break a log line or bloat a committed metadata record. A field that joins
-  several reasons bounds each reason, not the joined text.
+  several reasons bounds each reason, not the joined text. The stored reason
+  is never empty: a failure without readable text is stored with its HTTP
+  status, so the next poll still treats that window as failed and retries it.
 - A real GitHub API error that arrives as the request timeout fires now keeps
   its own message and status. A budget-capped reconciliation walk no longer
   reports such an error as a budget stop.

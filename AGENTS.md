@@ -326,12 +326,13 @@ conventions not covered by the linter.
   error, not from `signal.aborted` alone: a real API error can reject in the
   same turn the timer fires, and it must keep its own message and its own
   status. Only a failure that the abort caused sets `timedOut`, and only a
-  `timedOut` failure of a budget-capped request is a budget stop. A
-  timestamp read back from metadata MUST be validated before a comparison:
-  an unreadable value turns the comparison into `NaN`, which is false, so
-  the check would pass without a message. Fall back to the other timestamp
-  of the record and warn. A timeout MUST NOT be detected from a message
-  alone: a failure that carries a response is an HTTP error, not an abort.
+  `timedOut` failure of a budget-capped request is a budget stop. A timeout
+  MUST NOT be detected from one word of a message: a failure that carries a
+  response is an HTTP error, not an abort, and the only marker is the exact
+  message that `node-fetch` sets on an aborted request. A timestamp read back
+  from metadata MUST be validated before a comparison: an unreadable value
+  turns the comparison into `NaN`, which is false, so the check would pass
+  without a message. Fall back to the other timestamp of the record and warn.
 - **Logging**: Use `console.log` for progress, `console.warn` for
   recoverable issues (rate-limit warnings, missing optional data), and
   `console.error` for fatal errors. Disable the `no-console` ESLint rule
@@ -341,7 +342,11 @@ conventions not covered by the linter.
   [src/tools/error-utils.js](./src/tools/error-utils.js): it collapses
   whitespace to one line and bounds the length. A field that joins several
   reasons MUST bound each reason, not the joined text: a second pass over
-  the joined string cuts the reason it holds at the end. The metadata is
+  the joined string cuts the reason it holds at the end. A value that a later
+  run reads back as a retry reason, `error` and `backfillError` of the poll
+  metadata, MUST NOT be empty and MUST use `describeError` from the same
+  module: the next poll reads a record without a reason as a success, so an
+  empty text would hide the failure and skip every retry. The metadata is
   committed, so a raw multi-line API response would break a log line and
   bloat the record.
 - **Naming**: Files and directories use `kebab-case`
@@ -435,8 +440,10 @@ vulnerabilities, supply-chain risks, and long-term maintenance cost.
 ### Markdown Formatting
 
 All Markdown files MUST comply with the rules defined in
-[.markdownlint.json](./.markdownlint.json). Run `yarn lint` to check
-for violations; `yarn lint --fix` auto-fixes most of them.
+[.markdownlint.json](./.markdownlint.json). The `lint` script runs ESLint only,
+so it does not check Markdown. Run `npx markdownlint .` to check for violations;
+`npx markdownlint . --fix` auto-fixes most of them. `node_modules/` is excluded
+by [.markdownlintignore](./.markdownlintignore).
 
 ### Other
 

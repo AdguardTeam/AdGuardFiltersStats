@@ -183,10 +183,10 @@ longer than one day is not detected. `github-poll` warns when neither
 sidecar has a successful poll, so a skipped window is visible in the log.
 
 If the last successful record holds an unreadable `newestEventAt`, the poll
-measures the gap from the `timestamp` of that record, so the comparison is no
-longer false. An unreadable `timestamp` falls back to the `newestEventAt` of the
+measures the gap from the `timestamp` of that record, so the gap is still
+checked. An unreadable `timestamp` falls back to the `newestEventAt` of the
 record in the same way. The poll warns about each fallback, and warns that the
-gap check is skipped when the record has neither value. A backfill still starts
+gap check is skipped when neither value is readable. A backfill still starts
 only when the window is actually missing: a batch that overlaps the baseline
 needs none.
 
@@ -216,7 +216,8 @@ on the next poll.)
 The `backfillError` and `error` fields hold one line. A message that spans
 several lines is collapsed, and a message longer than 300 characters is cut.
 `backfillError` can hold more than one reason, separated by a semicolon and a
-space.
+space. A field is never empty: a failure without readable text is stored with
+its HTTP status, so the next poll still sees it as a failure.
 
 ### Print stats in console
 
