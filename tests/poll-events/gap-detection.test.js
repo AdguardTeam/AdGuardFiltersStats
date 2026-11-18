@@ -190,24 +190,19 @@ describe('pollEvents — gap detection', () => {
     });
 
     it('falls back to the record timestamp when newestEventAt is invalid', async () => {
-        const today = format(new Date(), 'yyyy-MM-dd');
-        const twoHoursAgo = subMinutes(new Date(), 120).toISOString();
-        const eventTime = subMinutes(new Date(), 30).toISOString();
-        const invalidRecord = {
+        const now = new Date();
+        const today = format(now, 'yyyy-MM-dd');
+        // Both values come from one clock read. The poll is 120 minutes old, so
+        // the time-based check reports a gap, and the window must then start at
+        // the record timestamp because the event timestamp is unreadable.
+        const twoHoursAgo = subMinutes(now, 120).toISOString();
+        const eventTime = subMinutes(now, 30).toISOString();
+        const invalidRecord = makeMetadataRecord({
             timestamp: twoHoursAgo,
-            totalEvents: 5,
-            pagesCollected: 1,
-            eventsInFile: 5,
-            rateLimitRemaining: 4995,
-            rateLimitReached: false,
-            rateLimitReset: null,
-            oldestEventAt: subMinutes(new Date(), 130).toISOString(),
+            oldestEventAt: subMinutes(now, 130).toISOString(),
             newestEventAt: 'not-a-date',
-            gapSuspected: false,
-            error: null,
             collectionPath: dir,
-            repo: 'a/b',
-        };
+        });
         await writeFile(
             path.join(dir, `${today}-metadata.json`),
             JSON.stringify([invalidRecord]),
@@ -236,24 +231,19 @@ describe('pollEvents — gap detection', () => {
     });
 
     it('falls back to newestEventAt when the record timestamp is invalid', async () => {
-        const today = format(new Date(), 'yyyy-MM-dd');
-        const twoHoursAgo = subMinutes(new Date(), 120).toISOString();
-        const eventTime = subMinutes(new Date(), 30).toISOString();
-        const invalidRecord = {
+        const now = new Date();
+        const today = format(now, 'yyyy-MM-dd');
+        // The batch starts 60 minutes after the newest event of the last poll.
+        // That is below the 90-minute event threshold, so the gap can come only
+        // from the time-based check, which reads the fallback value.
+        const twoHoursAgo = subMinutes(now, 120).toISOString();
+        const eventTime = subMinutes(now, 60).toISOString();
+        const invalidRecord = makeMetadataRecord({
             timestamp: 'not-a-date',
-            totalEvents: 5,
-            pagesCollected: 1,
-            eventsInFile: 5,
-            rateLimitRemaining: 4995,
-            rateLimitReached: false,
-            rateLimitReset: null,
-            oldestEventAt: subMinutes(new Date(), 130).toISOString(),
+            oldestEventAt: subMinutes(now, 130).toISOString(),
             newestEventAt: twoHoursAgo,
-            gapSuspected: false,
-            error: null,
             collectionPath: dir,
-            repo: 'a/b',
-        };
+        });
         await writeFile(
             path.join(dir, `${today}-metadata.json`),
             JSON.stringify([invalidRecord]),
@@ -282,27 +272,19 @@ describe('pollEvents — gap detection', () => {
 
     it('warns when the last successful poll has no usable timestamp', async () => {
         const today = format(new Date(), 'yyyy-MM-dd');
-        const invalidRecord = {
+        const invalidRecord = makeMetadataRecord({
             timestamp: 'not-a-date',
-            totalEvents: 5,
-            pagesCollected: 1,
-            eventsInFile: 5,
-            rateLimitRemaining: 4995,
-            rateLimitReached: false,
-            rateLimitReset: null,
-            oldestEventAt: null,
             newestEventAt: 'also-not-a-date',
-            gapSuspected: false,
-            error: null,
             collectionPath: dir,
-            repo: 'a/b',
-        };
+        });
         await writeFile(
             path.join(dir, `${today}-metadata.json`),
             JSON.stringify([invalidRecord]),
         );
         getGithubEvents.mockResolvedValueOnce(makeGhResponse(new Date().toISOString()));
         const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+        const issuesCallsBefore = getClosedIssuesInWindow.mock.calls.length;
+        const pullsCallsBefore = getPullsInWindow.mock.calls.length;
 
         try {
             await pollEvents(dir, { owner: 'a', repo: 'b' });
@@ -313,6 +295,16 @@ describe('pollEvents — gap detection', () => {
         } finally {
             warn.mockRestore();
         }
+
+        // Neither value can date the gap, so the check is skipped: no gap is
+        // reported and no walk starts. Reporting a gap here would send an
+        // unreadable window to the REST API.
+        const records = JSON.parse(
+            await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
+        );
+        expect(records[1].gapSuspected).toBe(false);
+        expect(getClosedIssuesInWindow.mock.calls.length).toBe(issuesCallsBefore);
+        expect(getPullsInWindow.mock.calls.length).toBe(pullsCallsBefore);
     });
 
     it('does not backfill an equal-bounds window', async () => {
@@ -817,6 +809,8 @@ describe('pollEvents — gap detection', () => {
             // reason, and keeps the reconciliation error in the diagnostics.
             expect(result.success).toBe(true);
             expect(records[1].backfillError).toContain('EACCES');
+            // The error text, not its `String()` form: no `Error: ` prefix.
+            expect(records[1].backfillError).not.toContain('Error: ');
             expect(warn).toHaveBeenCalledWith(expect.stringContaining('EACCES'));
             expect(warn.mock.calls.flat().join(' ')).toContain('The next poll retries');
         } finally {
@@ -825,23 +819,60 @@ describe('pollEvents — gap detection', () => {
         }
     });
 
+    itUnlessRoot('keeps the walk failure and the merge failure as two reasons', async () => {
+        const now = new Date();
+        const today = format(now, 'yyyy-MM-dd');
+        const eventTime = now.toISOString();
+        await writeFile(
+            path.join(dir, `${today}-metadata.json`),
+            JSON.stringify([makeMetadataRecord({
+                timestamp: subMinutes(now, 120).toISOString(),
+                oldestEventAt: subMinutes(now, 130).toISOString(),
+                newestEventAt: subMinutes(now, 121).toISOString(),
+                collectionPath: dir,
+            })]),
+        );
+        getGithubEvents.mockResolvedValueOnce(makeGhResponse(eventTime));
+        const dayFile = path.join(dir, `${today}.jsonl`);
+        // The walk reason is long enough to fill the whole bound on its own. A
+        // second pass over the joined text would therefore drop the write
+        // failure that follows it.
+        getPullsInWindow.mockRejectedValueOnce(new Error(`pulls ${'b'.repeat(400)}`));
+        getClosedIssuesInWindow.mockImplementationOnce(async () => {
+            await chmod(dayFile, 0o444);
+            return [{
+                id: 4002,
+                number: 43,
+                closed_at: eventTime,
+                closed_by: { id: 7, login: 'zloyden' },
+                labels: [],
+            }];
+        });
+        const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+
+        try {
+            await pollEvents(dir, { owner: 'a', repo: 'b' });
+
+            const records = JSON.parse(
+                await readFile(path.join(dir, `${today}-metadata.json`), 'utf8'),
+            );
+            // Each reason is bounded on its own, so both survive in the field.
+            expect(records[1].backfillError).toContain('pulls bbb');
+            expect(records[1].backfillError).toContain('EACCES');
+        } finally {
+            await chmod(dayFile, 0o644);
+            warn.mockRestore();
+        }
+    });
+
     it('stores a multi-line backfill error on one line', async () => {
         const today = format(new Date(), 'yyyy-MM-dd');
-        const oldRecord = {
+        const oldRecord = makeMetadataRecord({
             timestamp: subMinutes(new Date(), 120).toISOString(),
-            totalEvents: 5,
-            pagesCollected: 1,
-            eventsInFile: 5,
-            rateLimitRemaining: 4995,
-            rateLimitReached: false,
-            rateLimitReset: null,
             oldestEventAt: subMinutes(new Date(), 130).toISOString(),
             newestEventAt: subMinutes(new Date(), 121).toISOString(),
-            gapSuspected: false,
-            error: null,
             collectionPath: dir,
-            repo: 'a/b',
-        };
+        });
         await writeFile(
             path.join(dir, `${today}-metadata.json`),
             JSON.stringify([oldRecord]),
