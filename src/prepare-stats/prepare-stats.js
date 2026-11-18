@@ -47,8 +47,12 @@ const fetchCommitEvents = async (commonRequestData, timePeriod, repoMeta) => {
     try {
         commits = await getCommitsInWindow(commonRequestData, timePeriod);
     } catch (error) {
+        // Keep the status next to the message, as the retry warning does: a
+        // 401 and a 503 are different problems with the same kind of text.
+        const status = typeof error?.status === 'number' ? error.status : 'no status';
         logger.warn(
-            `⚠️ Failed to fetch commits for the reporting window: ${normalizeErrorMessage(error)}.`
+            `⚠️ Failed to fetch commits for the reporting window (${status}): `
+            + `${normalizeErrorMessage(error)}.`
             + ' Falling back to PushEvent counts; commit statistics may be incomplete.',
         );
         return null;
