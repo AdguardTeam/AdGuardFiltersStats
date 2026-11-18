@@ -233,6 +233,30 @@ describe('prepareStats — commit reconciliation', () => {
         warn.mockRestore();
     });
 
+    it('names the status when the commits request fails without a body', async () => {
+        const dir = await writeCollection([storedPush]);
+        // eslint-disable-next-line global-require
+        const gh = require('../../src/tools/gh-utils');
+        gh.getCommitsInWindow.mockRejectedValueOnce(
+            Object.assign(new Error(' \r\n'), { status: 502 }),
+        );
+        const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+        const stats = await prepareStats(
+            dir,
+            { owner: 'AdguardTeam', repo: 'AdguardFilters' },
+            commitWindow,
+        );
+
+        // An empty body must not leave the warning with no reason after the
+        // colon; `describeError` names the status instead.
+        expect(warn).toHaveBeenCalledWith(
+            expect.stringContaining('(502): request failed (502)'),
+        );
+        expect(stats.activitiesByUser['Alex-302'].totalCommits).toBe(1);
+        warn.mockRestore();
+    });
+
     it('warns when commits without a linked GitHub author are skipped', async () => {
         const dir = await writeCollection([storedPush]);
         // eslint-disable-next-line global-require
