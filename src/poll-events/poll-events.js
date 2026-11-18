@@ -185,8 +185,12 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
                 try {
                     await mergeSyntheticEventsIntoCollection(collectionPath, injectedEvents);
                 } catch (mergeError) {
-                    const mergeMessage = normalizeErrorMessage(
-                        `failed to store the recovered events: ${normalizeErrorMessage(mergeError)}`,
+                    // A retry reason must never be empty, so both the write
+                    // failure and the composed reason go through
+                    // `describeError`; the composed call also bounds the whole
+                    // reason after its prefix.
+                    const mergeMessage = describeError(
+                        `failed to store the recovered events: ${describeError(mergeError, 'store failed')}`,
                     );
                     // Each reason is one bounded line. Truncating the joined
                     // text would cut the write failure that just happened, so
