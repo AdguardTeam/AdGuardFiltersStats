@@ -4,7 +4,7 @@ import { getGithubEvents } from '../tools/gh-utils';
 import { reconcileWindow } from '../tools/reconcile';
 import { EVENT_EXPIRATION_DAYS, POLL_GAP_THRESHOLD_MS } from '../constants';
 import { logger } from '../tools/logger';
-import { normalizeErrorMessage } from '../tools/error-utils';
+import { describeError, normalizeErrorMessage } from '../tools/error-utils';
 import {
     removeOldFilesFromCollection,
     writePollToCollection,
@@ -186,7 +186,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
                     await mergeSyntheticEventsIntoCollection(collectionPath, injectedEvents);
                 } catch (mergeError) {
                     const mergeMessage = normalizeErrorMessage(
-                        `failed to store the recovered events: ${mergeError}`,
+                        `failed to store the recovered events: ${normalizeErrorMessage(mergeError)}`,
                     );
                     // Each reason is one bounded line. Truncating the joined
                     // text would cut the write failure that just happened, so
@@ -240,7 +240,10 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
             },
         };
     } catch (error) {
-        const message = normalizeErrorMessage(error);
+        // A stored reason must never be empty: the next poll reads a record
+        // without a reason as a success, so the failed window would never be
+        // retried.
+        const message = describeError(error, 'poll failed');
         const rateLimitReached = error?.rateLimitReached === true;
         const rateLimitReset = error?.rateLimitReset ?? null;
         try {

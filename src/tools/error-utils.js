@@ -62,3 +62,30 @@ export const normalizeErrorMessage = (errorOrMessage) => {
 
     return `${cut}...`;
 };
+
+/**
+ * Convert an error into one bounded line that is never empty.
+ *
+ * Use this helper for a value that a later run reads back as a retry reason:
+ * `error` and `backfillError` of the poll metadata. The next poll treats a
+ * record without a reason as a success, so an empty text would hide the
+ * failure and the window would never be walked again. A response body of
+ * whitespace only normalizes to an empty string, and a body that is absent
+ * carries no text at all, so the status names the failure instead.
+ *
+ * @param {unknown} error Error object, error message, or thrown value.
+ * @param {string} [fallback] Text for a failure that carries no readable message.
+ *
+ * @returns {string} Single-line reason of at most {@link MAX_ERROR_MESSAGE_LENGTH} characters.
+ */
+export const describeError = (error, fallback = 'request failed') => {
+    const message = normalizeErrorMessage(error);
+
+    if (message) {
+        return message;
+    }
+
+    const status = typeof error?.status === 'number' ? error.status : 'no status';
+
+    return `${fallback} (${status})`;
+};

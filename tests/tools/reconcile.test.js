@@ -13,6 +13,7 @@ import {
     getPullsInWindow,
 } from '../../src/tools/gh-utils';
 import { RECONCILE_BUDGET_MS } from '../../src/constants';
+import { MAX_ERROR_MESSAGE_LENGTH } from '../../src/tools/error-utils';
 
 jest.mock('../../src/tools/gh-utils', () => ({
     getClosedIssuesInWindow: jest.fn(),
@@ -227,29 +228,26 @@ describe('reconcileWindow', () => {
         jest.clearAllMocks();
     });
 
-    it('returns injectedEvents, endpointsSucceeded: 2, and no error when both requests succeed', async () => {
+    it('returns injectedEvents and no error when both requests succeed', async () => {
         getClosedIssuesInWindow.mockResolvedValueOnce([]);
         getPullsInWindow.mockResolvedValueOnce([]);
         const result = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
-        expect(result.endpointsSucceeded).toBe(2);
         expect(result.error).toBeNull();
         expect(result.injectedEvents).toEqual([]);
     });
 
-    it('returns partial events, endpointsSucceeded: 1, and error message when one request fails', async () => {
+    it('returns partial events and the error message when one request fails', async () => {
         getClosedIssuesInWindow.mockRejectedValueOnce(new Error('rate limit'));
         getPullsInWindow.mockResolvedValueOnce([]);
         const result = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
-        expect(result.endpointsSucceeded).toBe(1);
         expect(result.error).toContain('rate limit');
         expect(result.injectedEvents).toEqual([]);
     });
 
-    it('returns endpointsSucceeded: 0 and combined error when both requests fail', async () => {
+    it('returns a combined error when both requests fail', async () => {
         getClosedIssuesInWindow.mockRejectedValueOnce(new Error('issues fail'));
         getPullsInWindow.mockRejectedValueOnce(new Error('pulls fail'));
         const result = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
-        expect(result.endpointsSucceeded).toBe(0);
         expect(result.error).toContain('issues fail');
         expect(result.error).toContain('pulls fail');
     });
@@ -261,16 +259,43 @@ describe('reconcileWindow', () => {
         expect(result.error).toBe('issues fail; pulls fail');
     });
 
-    it('keeps both reasons when each one is long', async () => {
+    it('names the status when the rejection carries no readable text', async () => {
+        // An empty reason would pass the `!record.backfillError` filter of the
+        // next poll, so the failed window would count as a success.
+        getClosedIssuesInWindow.mockRejectedValueOnce(
+            Object.assign(new Error(' \r\n'), { status: 502 }),
+        );
+        getPullsInWindow.mockResolvedValueOnce([]);
+
+        const result = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
+
+        expect(result.error).toBe('request failed (502)');
+    });
+
+    it('reports a rejection without a message and without a status', async () => {
+        getClosedIssuesInWindow.mockRejectedValueOnce(new Error(''));
+        getPullsInWindow.mockResolvedValueOnce([]);
+
+        const result = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
+
+        expect(result.error).toBe('request failed (no status)');
+    });
+
+    it('bounds each reason when each one is long', async () => {
         getClosedIssuesInWindow.mockRejectedValueOnce(new Error(`issues ${'a'.repeat(400)}`));
         getPullsInWindow.mockRejectedValueOnce(new Error(`pulls ${'b'.repeat(400)}`));
 
         const result = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
 
         // Bounding each reason must not cut the reason of the second walk.
-        expect(result.error).toContain('issues aaa');
-        expect(result.error).toContain('pulls bbb');
-        expect(result.error).not.toContain('\n');
+        const reasons = result.error.split('; ');
+        expect(reasons).toHaveLength(2);
+        for (const reason of reasons) {
+            expect(reason).toHaveLength(MAX_ERROR_MESSAGE_LENGTH);
+            expect(reason.endsWith('...')).toBe(true);
+        }
+        expect(reasons[0].startsWith('issues aaa')).toBe(true);
+        expect(reasons[1].startsWith('pulls bbb')).toBe(true);
     });
 
     it('gives both walks the same budget and reports no truncation', async () => {

@@ -1,5 +1,5 @@
 import { getClosedIssuesInWindow, getPullsInWindow } from './gh-utils';
-import { normalizeErrorMessage } from './error-utils';
+import { describeError } from './error-utils';
 import { RECONCILE_BUDGET_MS } from '../constants';
 
 /**
@@ -153,11 +153,10 @@ export const buildSyntheticEvents = ({
  * @param {number} [options.budgetMs] Time budget for the whole reconciliation in milliseconds.
  * @param {boolean} [options.progress] Log each page of a long-running poll step.
  *
- * @returns {Promise<{injectedEvents: Array<object>, endpointsSucceeded: number,
- * truncated: boolean, budgetExceeded: boolean, error: string|null}>} Object with
- * synthetic events array, count of successful REST endpoint calls, whether a walk
- * stopped before it covered the window, whether the time budget (rather than the
- * page limit) stopped a walk, and error message if any.
+ * @returns {Promise<{injectedEvents: Array<object>, truncated: boolean,
+ * budgetExceeded: boolean, error: string|null}>} Object with synthetic events
+ * array, whether a walk stopped before it covered the window, whether the time
+ * budget (rather than the page limit) stopped a walk, and error message if any.
  */
 export const reconcileWindow = async (
     commonRequestData,
@@ -177,18 +176,17 @@ export const reconcileWindow = async (
     ]);
     const closedIssues = issuesResult.status === 'fulfilled' ? issuesResult.value : [];
     const pulls = pullsResult.status === 'fulfilled' ? pullsResult.value : [];
-    const endpointsSucceeded = [issuesResult, pullsResult]
-        .filter((r) => r.status === 'fulfilled').length;
+    // A reason must never be empty: the next poll reads a record without a
+    // reason as a success, so the failed window would never be retried.
     const errors = [issuesResult, pullsResult]
         .filter((r) => r.status === 'rejected')
-        .map((r) => normalizeErrorMessage(r.reason));
+        .map((r) => describeError(r.reason));
     const error = errors.length > 0 ? errors.join('; ') : null;
     return {
         injectedEvents: buildSyntheticEvents({
             // FIXME: add eslint rule to enforce multiline for 3 and more items in object/array literals
             closedIssues, pulls, repo: repoMeta, timePeriod,
         }),
-        endpointsSucceeded,
         truncated: budget.truncated,
         budgetExceeded: budget.budgetExceeded,
         // Each reason is already one bounded line. Truncating the joined text

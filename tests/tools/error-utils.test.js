@@ -1,5 +1,6 @@
 import {
     MAX_ERROR_MESSAGE_LENGTH,
+    describeError,
     normalizeErrorMessage,
 } from '../../src/tools/error-utils';
 
@@ -53,5 +54,34 @@ describe('normalizeErrorMessage', () => {
 
         expect(result).toHaveLength(MAX_ERROR_MESSAGE_LENGTH);
         expect(result.endsWith('...')).toBe(true);
+    });
+});
+
+describe('describeError', () => {
+    it('keeps the message of an error that carries one', () => {
+        expect(describeError(new Error('boom\nthere'))).toBe('boom there');
+    });
+
+    it('names the status when the error carries only whitespace', () => {
+        // A body of whitespace only normalizes to an empty string, and the next
+        // poll reads a record without a reason as a success.
+        const error = Object.assign(new Error(' \r\n '), { status: 502 });
+
+        expect(describeError(error)).toBe('request failed (502)');
+    });
+
+    it('says when the failure has no status', () => {
+        expect(describeError(new Error())).toBe('request failed (no status)');
+        expect(describeError(null)).toBe('request failed (no status)');
+    });
+
+    it('uses the fallback name of the calling step', () => {
+        expect(describeError(undefined, 'poll failed')).toBe('poll failed (no status)');
+    });
+
+    it('bounds a long message like normalizeErrorMessage', () => {
+        const result = describeError(new Error('a'.repeat(MAX_ERROR_MESSAGE_LENGTH * 2)));
+
+        expect(result).toHaveLength(MAX_ERROR_MESSAGE_LENGTH);
     });
 });
