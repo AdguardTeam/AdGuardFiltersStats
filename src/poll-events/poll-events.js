@@ -56,6 +56,10 @@ const isValidTimestamp = (value) => typeof value === 'string'
  * @returns {Promise<object>} Collection metadata.
  */
 export const pollEvents = async (collectionPath, commonRequestData) => {
+    // Declared before the `try` so a failure that happens after the filter
+    // still records how many events the batch dropped.
+    let skippedEventsCount = 0;
+
     try {
         // Get events from GitHub API with enhanced error handling
         const { events: fetchedEvents, metadata } = await getGithubEvents(commonRequestData);
@@ -66,7 +70,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
         // empty batch is a normal poll: it still records its metadata and still
         // runs the cleanup, so a quiet repository exits 0.
         const events = fetchedEvents.filter((event) => isValidTimestamp(event.created_at));
-        const skippedEventsCount = fetchedEvents.length - events.length;
+        skippedEventsCount = fetchedEvents.length - events.length;
         if (skippedEventsCount > 0) {
             const noun = skippedEventsCount === 1 ? 'event' : 'events';
             logger.warn(
@@ -247,6 +251,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
             totalEvents: metadata.totalEvents,
             pagesCollected: metadata.pagesCollected,
             eventsInFile: actualEventsWritten,
+            skippedEvents: skippedEventsCount,
             rateLimitRemaining: metadata.rateLimitRemaining,
             rateLimitReached: metadata.rateLimitReached,
             rateLimitReset: metadata.rateLimitReset,
@@ -267,6 +272,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
             metadata: {
                 ...metadata,
                 eventsInFile: actualEventsWritten,
+                skippedEvents: skippedEventsCount,
             },
         };
     } catch (error) {
@@ -284,6 +290,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
                     totalEvents: 0,
                     pagesCollected: 0,
                     eventsInFile: 0,
+                    skippedEvents: skippedEventsCount,
                     rateLimitRemaining: null,
                     rateLimitReached,
                     rateLimitReset,

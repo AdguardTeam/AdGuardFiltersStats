@@ -88,5 +88,10 @@ describe('github-poll entry', () => {
         expect(consoleErrorSpy).not.toHaveBeenCalled();
         const lines = consoleLogSpy.mock.calls.map((call) => call[0]);
         expect(lines).toContain('✅ Successfully fetched 0 events for a/b');
+        // A quiet poll is information, not a warning.
+        expect(lines).toContain(
+            'GitHub returned no events. This can be normal for a quiet repository.',
+        );
+        expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
 });

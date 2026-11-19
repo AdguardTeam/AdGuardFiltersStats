@@ -59,6 +59,7 @@ const makeMetadataRecord = (overrides = {}) => ({
     totalEvents: 5,
     pagesCollected: 1,
     eventsInFile: 5,
+    skippedEvents: 0,
     rateLimitRemaining: 4995,
     rateLimitReached: false,
     rateLimitReset: null,
@@ -105,6 +106,7 @@ describe('pollEvents — batch bounds and an empty batch', () => {
         const records = await readTodayRecords(dir);
         expect(records).toHaveLength(1);
         expect(records[0].error).toBeNull();
+        expect(records[0].skippedEvents).toBe(1);
         // The readable events still date the batch.
         expect(records[0].oldestEventAt).toBe(eventTime);
         expect(records[0].newestEventAt).toBe(eventTime);
@@ -126,6 +128,7 @@ describe('pollEvents — batch bounds and an empty batch', () => {
         expect(result.success).toBe(true);
         const records = await readTodayRecords(dir);
         expect(records[0].error).toBeNull();
+        expect(records[0].skippedEvents).toBe(1);
         expect(records[0].oldestEventAt).toBe(timestamp);
         expect(records[0].newestEventAt).toBe(timestamp);
         expect(warn.mock.calls.flat().join(' ')).toContain('Skipped 1 event');
@@ -143,6 +146,7 @@ describe('pollEvents — batch bounds and an empty batch', () => {
         const records = await readTodayRecords(dir);
         expect(records).toHaveLength(1);
         expect(records[0].totalEvents).toBe(0);
+        expect(records[0].skippedEvents).toBe(0);
         expect(records[0].error).toBeNull();
         expect(records[0].oldestEventAt).toBe(timestamp);
         expect(records[0].newestEventAt).toBe(timestamp);
@@ -181,6 +185,7 @@ describe('pollEvents — batch bounds and an empty batch', () => {
 
         expect(result.success).toBe(true);
         const records = await readTodayRecords(dir);
+        expect(records[0].skippedEvents).toBe(2);
         expect(records[0].oldestEventAt).toBe(eventTime);
         expect(records[0].newestEventAt).toBe(eventTime);
         expect(warn.mock.calls.flat().join(' ')).toContain('Skipped 2 events');

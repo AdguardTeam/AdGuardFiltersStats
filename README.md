@@ -207,6 +207,7 @@ on the next poll.)
 | `timestamp`              | ISO 8601 time when this poll ran                                                                                                 |
 | `totalEvents`            | Events fetched from GitHub API                                                                                                   |
 | `eventsInFile`           | Unique events written after deduplication                                                                                        |
+| `skippedEvents`          | Events dropped because `created_at` is not a readable timestamp                                                                  |
 | `pagesCollected`         | Number of API pages processed                                                                                                    |
 | `rateLimitReached`       | Whether the API rate limit was hit                                                                                               |
 | `rateLimitRemaining`     | Remaining API requests at poll time                                                                                              |

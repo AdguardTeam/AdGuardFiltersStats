@@ -37,7 +37,7 @@ dotenv.config();
             }
 
             if (metadata.totalEvents === 0) {
-                logger.warn('⚠️ GitHub returned no events. This can be normal for a quiet repository.');
+                logger.log('GitHub returned no events. This can be normal for a quiet repository.');
             }
 
             // Log the date for which we're collecting data
