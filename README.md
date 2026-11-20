@@ -147,6 +147,12 @@ removes duplicates already present in today's JSONL file, and appends
 new ones. The metadata sidecar is updated in place. Re-running on the
 same day is safe and idempotent.
 
+An event whose `created_at` is not a readable timestamp string is skipped
+with a warning that counts it. A poll that returns no events still
+succeeds: it records its metadata, runs the stale-file cleanup, and exits
+with code 0. The record counts as a successful poll, so the next poll
+measures the gap from its poll time.
+
 An Events API page request that fails with a transient error is retried
 up to three times with exponential backoff before the poll fails. A rate
 limit response is not retried and reports when the limit resets or how
@@ -201,12 +207,13 @@ on the next poll.)
 | `timestamp`              | ISO 8601 time when this poll ran                                                                                                 |
 | `totalEvents`            | Events fetched from GitHub API                                                                                                   |
 | `eventsInFile`           | Unique events written after deduplication                                                                                        |
+| `skippedEvents`          | Events dropped because `created_at` is not a readable timestamp                                                                  |
 | `pagesCollected`         | Number of API pages processed                                                                                                    |
 | `rateLimitReached`       | Whether the API rate limit was hit                                                                                               |
 | `rateLimitRemaining`     | Remaining API requests at poll time                                                                                              |
 | `rateLimitReset`         | ISO 8601 timestamp when the rate limit resets                                                                                    |
-| `oldestEventAt`          | `created_at` of the oldest event returned by this poll                                                                           |
-| `newestEventAt`          | `created_at` of the newest event returned by this poll                                                                           |
+| `oldestEventAt`          | `created_at` of the oldest readable event of this poll, or the poll `timestamp` when none is readable                            |
+| `newestEventAt`          | `created_at` of the newest readable event of this poll, or the poll `timestamp` when none is readable                            |
 | `gapSuspected`           | `true` if no successful poll for >90 min (a failed or budget-stopped backfill does not count) or an event-window gap is detected |
 | `backfillTruncated`      | `true` if a gap backfill stopped early (time budget or page limit)                                                               |
 | `backfillBudgetExceeded` | `true` if the time budget, rather than the page limit, stopped a backfill                                                        |

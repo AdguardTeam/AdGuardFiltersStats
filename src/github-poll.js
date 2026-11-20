@@ -2,76 +2,62 @@ import * as dotenv from 'dotenv';
 import { format } from 'date-fns';
 import { pollEvents } from './poll-events';
 import { MAX_NUMBER_OF_MOST_RECENT_EVENTS } from './constants';
-import { normalizeErrorMessage } from './tools/error-utils';
+import { requireEnvVars } from './tools/env-utils';
+import { describeError } from './tools/error-utils';
+import { logger } from './tools/logger';
 
 dotenv.config();
-const { COLLECTION_PATH, REPO } = process.env;
-
-if (!COLLECTION_PATH || !REPO) {
-    // eslint-disable-next-line no-console
-    console.error('Error: COLLECTION_PATH and REPO environment variables must be set');
-    process.exit(1);
-}
-
-const commonRequestData = {
-    owner: REPO.split('/')[0],
-    repo: REPO.split('/')[1],
-};
 
 (async () => {
     try {
-        // eslint-disable-next-line no-console
-        console.log(`Starting GitHub events polling for ${REPO} at ${new Date().toISOString()}`);
+        const { COLLECTION_PATH, REPO } = requireEnvVars(['COLLECTION_PATH', 'REPO']);
+
+        const commonRequestData = {
+            owner: REPO.split('/')[0],
+            repo: REPO.split('/')[1],
+        };
+
+        logger.log(`Starting GitHub events polling for ${REPO} at ${new Date().toISOString()}`);
 
         const result = await pollEvents(COLLECTION_PATH, commonRequestData);
 
         if (result.success) {
             const { metadata } = result;
-            // eslint-disable-next-line no-console
-            console.log(`✅ Successfully collected ${metadata.totalEvents} events for ${REPO}`);
-            // eslint-disable-next-line no-console
-            console.log(`   ${metadata.eventsInFile} unique events written after deduplication`);
+            logger.log(`✅ Successfully fetched ${metadata.totalEvents} events for ${REPO}`);
+            logger.log(`   ${metadata.eventsInFile} unique events written after deduplication`);
 
             if (metadata.rateLimitReached) {
-                // eslint-disable-next-line no-console
-                console.warn('⚠️ GitHub API rate limit was reached during collection');
-                // eslint-disable-next-line no-console
-                console.warn(`Rate limit will reset at: ${metadata.rateLimitReset}`);
+                logger.warn('⚠️ GitHub API rate limit was reached during collection');
+                logger.warn(`Rate limit will reset at: ${metadata.rateLimitReset}`);
             }
 
             if (metadata.totalEvents >= MAX_NUMBER_OF_MOST_RECENT_EVENTS) {
-                // eslint-disable-next-line no-console
-                console.warn(`⚠️ GitHub Events API limit of ${MAX_NUMBER_OF_MOST_RECENT_EVENTS} events was reached`);
-                // eslint-disable-next-line no-console
-                console.warn('Some events may be missing. Consider polling more frequently.');
+                logger.warn(`⚠️ GitHub Events API limit of ${MAX_NUMBER_OF_MOST_RECENT_EVENTS} events was reached`);
+                logger.warn('Some events may be missing. Consider polling more frequently.');
             }
 
             if (metadata.totalEvents === 0) {
-                // eslint-disable-next-line no-console
-                console.warn('⚠️ No events were collected for today. This might indicate an issue.');
+                logger.log('GitHub returned no events. This can be normal for a quiet repository.');
             }
 
             // Log the date for which we're collecting data
             const today = format(new Date(), 'yyyy-MM-dd');
-            // eslint-disable-next-line no-console
-            console.log(`Data collected for ${today}`);
+            logger.log(`Data collected for ${today}`);
         } else {
-            // eslint-disable-next-line no-console
-            console.error('❌ Failed to collect GitHub events');
-            // eslint-disable-next-line no-console
-            console.error(`Error: ${result.error || 'Unknown error'}`);
+            logger.error('❌ Failed to collect GitHub events');
+            logger.error(`Error: ${result.error || 'Unknown error'}`);
 
             if (result.metadata) {
-                // eslint-disable-next-line no-console
-                console.error('Metadata:', JSON.stringify(result.metadata, null, 2));
+                logger.error('Metadata:', JSON.stringify(result.metadata, null, 2));
             }
 
             // Exit with error code to notify CI/CD systems or cron job monitors
             process.exit(1);
         }
     } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('❌ Unhandled error in GitHub polling script:', normalizeErrorMessage(error));
+        // One line and a non-zero exit: a stack trace hides the cause in the
+        // CI log, and the exit code reports the failure to the workflow.
+        logger.error(`❌ ${describeError(error, 'poll failed')}`);
         process.exit(1);
     }
 })();

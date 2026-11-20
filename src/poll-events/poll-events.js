@@ -28,16 +28,20 @@ const getMetadataPath = (collectionPath, date) => {
 };
 
 /**
- * Report whether a value converts to a usable timestamp.
+ * Report whether a value is a non-empty string that converts to a usable
+ * timestamp.
  *
- * The metadata is read back from the collection, so a hand-edited or
+ * A metadata record is read back from the collection, so a hand-edited or
  * truncated record can hold a value that `new Date()` cannot parse. Such a
  * value turns every comparison into `NaN`, and a `NaN` comparison is false,
- * so the gap would be skipped without a message.
+ * so the gap would be skipped without a message. An event takes its
+ * `created_at` from the API, and that value can be absent or numeric. Only
+ * a non-empty string is a timestamp: `new Date(null)` is the epoch, not a
+ * failure, and such an event would reach the collection as 1970-01-01.
  *
  * @param {unknown} value Value to check.
  *
- * @returns {boolean} `true` when the value converts to a finite epoch time.
+ * @returns {boolean} `true` when the value is a non-empty string with a finite epoch time.
  */
 const isValidTimestamp = (value) => typeof value === 'string'
     && value.length > 0
@@ -52,24 +56,48 @@ const isValidTimestamp = (value) => typeof value === 'string'
  * @returns {Promise<object>} Collection metadata.
  */
 export const pollEvents = async (collectionPath, commonRequestData) => {
+    // Declared before the `try` so a failure that happens after the filter
+    // still records how many events the batch dropped.
+    let skippedEventsCount = 0;
+
     try {
         // Get events from GitHub API with enhanced error handling
-        const { events, metadata } = await getGithubEvents(commonRequestData);
+        const { events: fetchedEvents, metadata } = await getGithubEvents(commonRequestData);
 
-        if (events.length === 0) {
-            logger.error('No events were collected from GitHub API');
-            return { success: false, metadata };
+        // An event without a readable `created_at` has no day to be stored on,
+        // and one such value turns both batch bounds into `NaN`. Drop it before
+        // the batch is stored, and report how many events are affected. An
+        // empty batch is a normal poll: it still records its metadata and still
+        // runs the cleanup, so a quiet repository exits 0.
+        const events = fetchedEvents.filter((event) => isValidTimestamp(event.created_at));
+        skippedEventsCount = fetchedEvents.length - events.length;
+        if (skippedEventsCount > 0) {
+            const noun = skippedEventsCount === 1 ? 'event' : 'events';
+            logger.warn(
+                `⚠️ Skipped ${skippedEventsCount} ${noun} with an unreadable created_at. `
+                + 'Such an event cannot be placed on a day.',
+            );
         }
 
-        // Write events to collection
+        // Write events to collection. The call creates the collection
+        // directory, so the cleanup below also runs for an empty batch.
         await writePollToCollection(collectionPath, events);
         const actualEventsWritten = await removeDupesFromCollection(collectionPath);
         await removeOldFilesFromCollection(collectionPath, EVENT_EXPIRATION_DAYS);
 
-        // Compute event time bounds for gap detection and diagnostics
-        const eventTimes = events.map((e) => new Date(e.created_at).getTime());
-        const oldestEventAt = new Date(Math.min(...eventTimes)).toISOString();
-        const newestEventAt = new Date(Math.max(...eventTimes)).toISOString();
+        // Compute event time bounds for gap detection and diagnostics. A batch
+        // without a readable event time, such as an empty batch, falls back to
+        // the poll time, so the record stays usable for the next poll.
+        const eventTimes = events.map((event) => new Date(event.created_at).getTime());
+        const pollTime = isValidTimestamp(metadata.timestamp)
+            ? metadata.timestamp
+            : new Date().toISOString();
+        const oldestEventAt = eventTimes.length > 0
+            ? new Date(Math.min(...eventTimes)).toISOString()
+            : pollTime;
+        const newestEventAt = eventTimes.length > 0
+            ? new Date(Math.max(...eventTimes)).toISOString()
+            : pollTime;
 
         // Read the current and the previous day metadata to detect a gap. A
         // poll after midnight must still find the last successful poll of the
@@ -217,10 +245,13 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
 
         // Store metadata for diagnostics (one record per poll, append-only)
         await appendMetadataRecord(metadataPath, {
-            timestamp: metadata.timestamp,
+            // The validated value, so the record never stores an unreadable
+            // timestamp while its bounds are usable.
+            timestamp: pollTime,
             totalEvents: metadata.totalEvents,
             pagesCollected: metadata.pagesCollected,
             eventsInFile: actualEventsWritten,
+            skippedEvents: skippedEventsCount,
             rateLimitRemaining: metadata.rateLimitRemaining,
             rateLimitReached: metadata.rateLimitReached,
             rateLimitReset: metadata.rateLimitReset,
@@ -241,6 +272,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
             metadata: {
                 ...metadata,
                 eventsInFile: actualEventsWritten,
+                skippedEvents: skippedEventsCount,
             },
         };
     } catch (error) {
@@ -258,6 +290,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
                     totalEvents: 0,
                     pagesCollected: 0,
                     eventsInFile: 0,
+                    skippedEvents: skippedEventsCount,
                     rateLimitRemaining: null,
                     rateLimitReached,
                     rateLimitReset,

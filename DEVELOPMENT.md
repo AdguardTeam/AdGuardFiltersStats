@@ -298,9 +298,11 @@ regressed.
 
 ### Adding a new environment variable
 
-1. Read it from `process.env` at the top of the relevant CLI entry in
-   [src/](./src/), validating it and exiting non-zero on missing
-   required values.
+1. Add a required variable to the list passed to `requireEnvVars` from
+   [src/tools/env-utils.js](./src/tools/env-utils.js) at the top of the
+   relevant CLI entry in [src/](./src/). The helper reports every absent
+   variable in one line and the entry exits non-zero. Read an optional
+   variable, such as `SINCE` or `UNTIL`, directly from `process.env`.
 2. Add it to [.env-example](./.env-example) with a placeholder value.
 3. Document it in [README.md](./README.md#configuration) and in the table in
    [Step 3](#3-configure-environment-variables) of this guide.
@@ -360,10 +362,12 @@ your latest changes.
 You can also drop `debugger;` statements anywhere in `src/` or
 `tests/` — Babel preserves them.
 
-For ad-hoc logging, the project standard is plain `console.log` /
-`console.warn` / `console.error` with an inline
-`// eslint-disable-next-line no-console` comment at each call site, as
-already used in the codebase.
+For ad-hoc logging, use `logger` from
+[src/tools/logger.js](./src/tools/logger.js) (`logger.log`,
+`logger.warn`, `logger.error`). The wrapper forwards to `console` and
+centralizes the `no-console` disable. A direct `console` call needs an
+inline `// eslint-disable-next-line no-console` comment at each call
+site.
 
 ## Troubleshooting
 

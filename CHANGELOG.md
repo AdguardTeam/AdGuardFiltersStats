@@ -11,6 +11,19 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 
 ### Fixed
 
+- `github-poll` no longer fails when one event has an unreadable
+  `created_at`. The poll skips such an event, warns with the count, and
+  records the batch bounds from the events it can read. A batch without a
+  readable event time uses the poll time instead. The metadata record holds
+  the count in `skippedEvents`.
+- An empty events batch is now a successful poll: it records its metadata,
+  runs the stale-file cleanup, and exits with code 0. `github-poll` logs the
+  empty result as information, not as a warning.
+- `github-poll`, `github-stats`, and `github-publish` now validate the
+  required environment variables before they start, and report a failure
+  with one line and exit code 1 instead of a stack trace.
+  `github-publish` also requires `SLACK_OAUTH_TOKEN` and
+  `SLACK_CHANNEL_ID`. The message names the variables that are absent.
 - `github-poll` now stops a gap reconciliation at a 3-minute budget, so a
   slow REST backfill cannot overrun the poll step timeout and the collected
   events are still committed. A failed backfill and a backfill that stops at
