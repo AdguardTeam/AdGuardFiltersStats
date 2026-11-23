@@ -70,5 +70,23 @@
     "error": null,
     "collectionPath": "./stats-data",
     "repo": "AdguardTeam/AdguardFilters"
+  },
+  {
+    "timestamp": "2026-11-23T02:12:31.479Z",
+    "totalEvents": 299,
+    "pagesCollected": 3,
+    "eventsInFile": 82,
+    "rateLimitRemaining": 4995,
+    "rateLimitReached": false,
+    "rateLimitReset": "2026-11-23T03:12:07.000Z",
+    "oldestEventAt": "2026-11-20T09:28:21.000Z",
+    "newestEventAt": "2026-11-23T02:10:39.000Z",
+    "gapSuspected": false,
+    "backfillTruncated": false,
+    "backfillBudgetExceeded": false,
+    "backfillError": null,
+    "error": null,
+    "collectionPath": "./stats-data",
+    "repo": "AdguardTeam/AdguardFilters"
   }
 ]
