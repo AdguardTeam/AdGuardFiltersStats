@@ -24,6 +24,23 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
   with one line and exit code 1 instead of a stack trace.
   `github-publish` also requires `SLACK_OAUTH_TOKEN` and
   `SLACK_CHANNEL_ID`. The message names the variables that are absent.
+  `REPO` must be in `owner/repo_name` form.
+- The CLI entries now load `.env` before any module that reads
+  `process.env` at import time, so a `GITHUB_TOKEN` from `.env` alone
+  authenticates the bundled commands.
+- `github-poll` reports a failed poll on one line instead of a second
+  error line and a multi-line metadata dump.
+- A Slack failure now rejects `publishMessage()` and `replyMessage()`, so
+  `github-publish` reports the Slack reason on one line and exits non-zero
+  instead of crashing on `undefined` or exiting 0 after a failed reply.
+- `github-stats` and `github-publish` without `SINCE` now read every
+  stored day, as documented, instead of failing with `Invalid interval`.
+  `RECONCILE` needs `SINCE` and is ignored with a warning otherwise.
+- `github-poll` now removes a metadata sidecar together with its day file
+  when the day is older than `EVENT_EXPIRATION_DAYS`, so the sidecars no
+  longer accumulate without limit. The first poll after upgrading also
+  removes the sidecars that earlier versions left behind; keep a copy
+  outside the collection if that history is needed.
 - `github-poll` now stops a gap reconciliation at a 3-minute budget, so a
   slow REST backfill cannot overrun the poll step timeout and the collected
   events are still committed. A failed backfill and a backfill that stops at

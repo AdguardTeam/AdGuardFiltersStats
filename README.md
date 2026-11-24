@@ -45,12 +45,19 @@ Events are stored as one JSONL file per day (`YYYY-MM-DD.jsonl`) under
 tracks how many events were fetched, how many were written after
 deduplication, and rate-limit status.
 
+A day file and its metadata sidecar expire together after 30 days. The
+first poll after this version also removes the sidecars that earlier
+versions left behind, so a collection that holds older sidecars loses
+them on that run. Keep a copy outside `COLLECTION_PATH` if that history
+is needed.
+
 ### Time window
 
 `github-stats` and `github-publish` operate on a time window defined by
 `SINCE` and `UNTIL`. If `SINCE` is omitted, all stored events are used.
-If `UNTIL` is omitted, the current time is used. Daily files older than
-30 days are automatically pruned during `github-poll`.
+If `UNTIL` is omitted, the current time is used. Daily files and their
+metadata sidecars older than 30 days are automatically pruned during
+`github-poll`.
 
 ### Stats accuracy
 
@@ -145,13 +152,17 @@ unauthenticated requests to 60 per hour).
 Each run fetches the most recent events from the GitHub Events API,
 removes duplicates already present in today's JSONL file, and appends
 new ones. The metadata sidecar is updated in place. Re-running on the
-same day is safe and idempotent.
+same day is safe and idempotent. Day files and their metadata sidecars
+older than 30 days are removed; the first run after this version also
+removes the older sidecars left by earlier runs.
 
 An event whose `created_at` is not a readable timestamp string is skipped
 with a warning that counts it. A poll that returns no events still
 succeeds: it records its metadata, runs the stale-file cleanup, and exits
-with code 0. The record counts as a successful poll, so the next poll
-measures the gap from its poll time.
+with code 0. The record is the gap baseline only when its backfill
+succeeded: a record with `backfillError` or `backfillBudgetExceeded` is
+skipped, and the next poll retries the gap from the previous successful
+poll.
 
 An Events API page request that fails with a transient error is retried
 up to three times with exponential backoff before the poll fails. A rate
@@ -206,8 +217,8 @@ on the next poll.)
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
 | `timestamp`              | ISO 8601 time when this poll ran                                                                                                 |
 | `totalEvents`            | Events fetched from GitHub API                                                                                                   |
-| `eventsInFile`           | Unique events written after deduplication                                                                                        |
-| `skippedEvents`          | Events dropped because `created_at` is not a readable timestamp                                                                  |
+| `eventsInFile`           | Unique events in today's file after deduplication, not only the events of this poll                                              |
+| `skippedEvents`          | Events dropped from this poll because `created_at` is unreadable; the rest of `totalEvents` is written before deduplication      |
 | `pagesCollected`         | Number of API pages processed                                                                                                    |
 | `rateLimitReached`       | Whether the API rate limit was hit                                                                                               |
 | `rateLimitRemaining`     | Remaining API requests at poll time                                                                                              |
@@ -270,8 +281,10 @@ entries load a `.env` file from the working directory if one exists.
 | `UNTIL`           | `stats`, `publish`                       | Upper bound of the time window (ISO 8601). Defaults to now if omitted.                                                                                                           |
 | `RECONCILE`       | —                                        | Set to `true` to back-fill missing issue and PR events from the GitHub REST API during `stats`/`publish`. Commit activity is read from the REST API. Disabled by default.        |
 
-`RECONCILE` reconciliation stops at a 3-minute budget. When the budget is
-spent, the tools warn that the report may under-report.
+`RECONCILE` reconciliation needs `SINCE`: without a lower bound it is
+ignored with a warning, and the report covers every stored day. The
+reconciliation stops at a 3-minute budget. When the budget is spent, the
+tools warn that the report may under-report.
 
 ### Publishing variables
 

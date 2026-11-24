@@ -233,7 +233,8 @@ Universal principles the codebase follows:
   names) instead of magic strings.
 - **Observability Built-in** — `github-poll` logs structured progress and
   rate-limit warnings to stdout/stderr. New long-running steps SHOULD
-  log similarly via `console.log` / `console.warn`.
+  log similarly through `logger` from
+  [src/tools/logger.js](./src/tools/logger.js).
 - **Keep It Boring** — prefer well-understood Node patterns
   (`async/await`, plain objects) over clever or novel
   solutions.
@@ -422,7 +423,10 @@ vulnerabilities, supply-chain risks, and long-term maintenance cost.
 
 - **Runtime configuration**: All configuration is provided via
   environment variables, loaded by `dotenv` at the top of each CLI entry
-  in [src/](./src/). The supported variables are:
+  in [src/](./src/). An entry MUST put `import 'dotenv/config';` first:
+  `gh-utils` reads `GITHUB_TOKEN` and creates its client at import time,
+  and a later `dotenv.config()` would not authenticate it. The supported
+  variables are:
   `COLLECTION_PATH`, `GITHUB_TOKEN`, `REPO`, `SINCE`, `UNTIL`,
   `SLACK_OAUTH_TOKEN`, `SLACK_CHANNEL_ID`. See
   [README.md#configuration](./README.md#configuration) for semantics.
