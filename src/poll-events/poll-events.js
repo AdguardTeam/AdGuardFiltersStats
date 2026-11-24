@@ -2,7 +2,7 @@ import path from 'path';
 import { format, subDays } from 'date-fns';
 import { getGithubEvents } from '../tools/gh-utils';
 import { reconcileWindow } from '../tools/reconcile';
-import { EVENT_EXPIRATION_DAYS, POLL_GAP_THRESHOLD_MS } from '../constants';
+import { EVENT_EXPIRATION_DAYS, METADATA_FILE_SUFFIX, POLL_GAP_THRESHOLD_MS } from '../constants';
 import { logger } from '../tools/logger';
 import { describeError, normalizeErrorMessage } from '../tools/error-utils';
 import {
@@ -24,7 +24,7 @@ import {
  */
 const getMetadataPath = (collectionPath, date) => {
     const day = format(date, 'yyyy-MM-dd');
-    return path.join(collectionPath, `${day}-metadata.json`);
+    return path.join(collectionPath, `${day}${METADATA_FILE_SUFFIX}`);
 };
 
 /**
@@ -53,13 +53,10 @@ const isValidTimestamp = (value) => typeof value === 'string'
  * @param {string} collectionPath Path to events collection.
  * @param {object} commonRequestData GitHub API request parameters.
  *
- * @returns {Promise<object>} Collection metadata.
+ * @returns {Promise<{success: boolean, error?: string, metadata: object}>} `success` and the
+ * poll metadata; a failed poll also holds `error`.
  */
 export const pollEvents = async (collectionPath, commonRequestData) => {
-    // Declared before the `try` so a failure that happens after the filter
-    // still records how many events the batch dropped.
-    let skippedEventsCount = 0;
-
     try {
         // Get events from GitHub API with enhanced error handling
         const { events: fetchedEvents, metadata } = await getGithubEvents(commonRequestData);
@@ -70,7 +67,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
         // empty batch is a normal poll: it still records its metadata and still
         // runs the cleanup, so a quiet repository exits 0.
         const events = fetchedEvents.filter((event) => isValidTimestamp(event.created_at));
-        skippedEventsCount = fetchedEvents.length - events.length;
+        const skippedEventsCount = fetchedEvents.length - events.length;
         if (skippedEventsCount > 0) {
             const noun = skippedEventsCount === 1 ? 'event' : 'events';
             logger.warn(
@@ -89,9 +86,7 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
         // without a readable event time, such as an empty batch, falls back to
         // the poll time, so the record stays usable for the next poll.
         const eventTimes = events.map((event) => new Date(event.created_at).getTime());
-        const pollTime = isValidTimestamp(metadata.timestamp)
-            ? metadata.timestamp
-            : new Date().toISOString();
+        const pollTime = metadata.timestamp;
         const oldestEventAt = eventTimes.length > 0
             ? new Date(Math.min(...eventTimes)).toISOString()
             : pollTime;
@@ -245,8 +240,6 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
 
         // Store metadata for diagnostics (one record per poll, append-only)
         await appendMetadataRecord(metadataPath, {
-            // The validated value, so the record never stores an unreadable
-            // timestamp while its bounds are usable.
             timestamp: pollTime,
             totalEvents: metadata.totalEvents,
             pagesCollected: metadata.pagesCollected,
@@ -272,7 +265,6 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
             metadata: {
                 ...metadata,
                 eventsInFile: actualEventsWritten,
-                skippedEvents: skippedEventsCount,
             },
         };
     } catch (error) {
@@ -290,7 +282,6 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
                     totalEvents: 0,
                     pagesCollected: 0,
                     eventsInFile: 0,
-                    skippedEvents: skippedEventsCount,
                     rateLimitRemaining: null,
                     rateLimitReached,
                     rateLimitReset,
@@ -309,7 +300,6 @@ export const pollEvents = async (collectionPath, commonRequestData) => {
             // Writing error metadata failed — log and continue so the original error is still reported.
             logger.error('Failed to persist error metadata:', normalizeErrorMessage(metaErr));
         }
-        logger.error('Error in pollEvents:', message);
         // Return failure status and error information
         return {
             success: false,

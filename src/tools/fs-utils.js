@@ -24,7 +24,11 @@ import {
     isCreatedUntil,
     sortEventsByDate,
 } from './events-utils';
-import { MILLISECONDS_IN_DAY, COLLECTION_FILE_EXTENSION } from '../constants';
+import {
+    MILLISECONDS_IN_DAY,
+    COLLECTION_FILE_EXTENSION,
+    METADATA_FILE_SUFFIX,
+} from '../constants';
 import { logger } from './logger';
 
 /**
@@ -79,6 +83,29 @@ const getEventsFromFile = async (path, timePeriod) => {
 };
 
 /**
+ * Extract the day from a collection file name.
+ *
+ * A day file is `YYYY-MM-DD.jsonl` and its sidecar is
+ * `YYYY-MM-DD-metadata.json`. Any other file is not part of the
+ * collection and is left in place.
+ *
+ * @param {string} filename File name from the collection directory.
+ *
+ * @returns {string|null} The `YYYY-MM-DD` day, or `null` for another file.
+ */
+const getCollectionFileDay = (filename) => {
+    const hasKnownSuffix = filename.endsWith(COLLECTION_FILE_EXTENSION)
+        || filename.endsWith(METADATA_FILE_SUFFIX);
+    if (!hasKnownSuffix) {
+        return null;
+    }
+
+    const day = filename.slice(0, 10);
+
+    return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
+};
+
+/**
  * Gets array of GitHub event objects from collection and by search time.
  *
  * @param {string} path Path to collection dir.
@@ -92,13 +119,26 @@ const getEventsFromCollection = async (path, timePeriod) => {
         return [];
     }
 
-    const wantedDates = eachDayOfInterval({
-        start: new Date(timePeriod.since),
-        end: new Date(timePeriod.until),
-    });
-    const wantedFilenames = wantedDates.map((date) => `${format(date, 'yyy-MM-dd')}${COLLECTION_FILE_EXTENSION}`);
     const ownedFilenames = await readdir(path);
-    const filenamesInStock = intersection(wantedFilenames, ownedFilenames);
+    let filenamesInStock;
+    if (timePeriod.since) {
+        const wantedDates = eachDayOfInterval({
+            start: new Date(timePeriod.since),
+            end: new Date(timePeriod.until),
+        });
+        const wantedFilenames = wantedDates
+            .map((date) => `${format(date, 'yyy-MM-dd')}${COLLECTION_FILE_EXTENSION}`);
+        filenamesInStock = intersection(wantedFilenames, ownedFilenames);
+    } else {
+        // Without a lower bound the report covers every stored event, as the
+        // README promises. The collection holds at most the expiration window
+        // of day files, so reading them all stays bounded.
+        filenamesInStock = ownedFilenames.filter((filename) => {
+            return filename.endsWith(COLLECTION_FILE_EXTENSION)
+                && getCollectionFileDay(filename) !== null;
+        });
+    }
+
     const eventsFromPeriod = await Promise.all(filenamesInStock.map(async (filename) => {
         return getEventsFromFile(`${path}/${filename}`, timePeriod);
     }));
@@ -234,6 +274,10 @@ const removeDupesFromCollection = async (path) => {
 /**
  * Deletes files that are older than specified.
  *
+ * A day file and its metadata sidecar expire together: the gap baseline
+ * reads only the current and the previous day, so an older sidecar is no
+ * longer needed.
+ *
  * @param {string} path Path to a collection.
  * @param {number} expirationDays Number of days representing events lifespan.
  */
@@ -242,8 +286,11 @@ const removeOldFilesFromCollection = async (path, expirationDays) => {
     const expirationTime = expirationDays * MILLISECONDS_IN_DAY;
 
     const oldFilenames = filenames.filter((filename) => {
-        const date = filename.substring(0, filename.indexOf(COLLECTION_FILE_EXTENSION));
-        const daysOld = new Date(date).getTime();
+        const day = getCollectionFileDay(filename);
+        if (!day) {
+            return false;
+        }
+        const daysOld = new Date(day).getTime();
         return Date.now() - daysOld > expirationTime;
     });
 

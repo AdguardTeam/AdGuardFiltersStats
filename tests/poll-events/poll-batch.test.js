@@ -106,6 +106,8 @@ describe('pollEvents — batch bounds and an empty batch', () => {
         const records = await readTodayRecords(dir);
         expect(records).toHaveLength(1);
         expect(records[0].error).toBeNull();
+        // `totalEvents` is the fetched count, not the filtered count.
+        expect(records[0].totalEvents).toBe(2);
         expect(records[0].skippedEvents).toBe(1);
         // The readable events still date the batch.
         expect(records[0].oldestEventAt).toBe(eventTime);
