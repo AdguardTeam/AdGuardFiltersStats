@@ -1,12 +1,10 @@
-import * as dotenv from 'dotenv';
+import 'dotenv/config';
 import { startOfYesterday, endOfYesterday } from 'date-fns';
 import { prepareStats } from './prepare-stats';
 import { publishStats } from './publish-stats';
-import { requireEnvVars } from './tools/env-utils';
+import { parseRepo, requireEnvVars } from './tools/env-utils';
 import { describeError } from './tools/error-utils';
 import { logger } from './tools/logger';
-
-dotenv.config();
 
 (async () => {
     try {
@@ -23,12 +21,9 @@ dotenv.config();
         ]);
         const { SINCE, UNTIL } = process.env;
 
-        const commonRequestData = {
-            owner: REPO.split('/')[0],
-            repo: REPO.split('/')[1],
-        };
+        const commonRequestData = parseRepo(REPO);
 
-        // Set defaults to last 24h period
+        // Default to the previous calendar day
         const timePeriod = {
             since: SINCE || startOfYesterday().toISOString(),
             until: UNTIL || endOfYesterday().toISOString(),

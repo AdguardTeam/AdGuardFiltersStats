@@ -1,11 +1,11 @@
-jest.mock('dotenv', () => ({ config: jest.fn() }));
+jest.mock('dotenv/config', () => ({}));
 jest.mock('../src/prepare-stats', () => ({
     // The main work always fails, so the catch path needs no extra setup.
     prepareStats: jest.fn(async () => {
         throw new Error('Request failed\nwith a body: <html>');
     }),
 }));
-jest.mock('../src/print-stats/print-stats', () => ({ printStats: jest.fn() }));
+jest.mock('../src/print-stats', () => ({ printStats: jest.fn() }));
 
 // eslint-disable-next-line import/first
 import { prepareStats } from '../src/prepare-stats';
@@ -67,6 +67,19 @@ describe('github-stats entry', () => {
         expect(exitSpy).toHaveBeenCalledWith(1);
         const [line] = consoleErrorSpy.mock.calls[0];
         expect(line).toContain('REPO environment variable must be set');
+        expect(line.split('\n')).toHaveLength(1);
+    });
+
+    it('prints one line and exits with code 1 when REPO has no owner part', () => {
+        process.env.COLLECTION_PATH = './stats-data';
+        process.env.REPO = 'no-slash';
+
+        loadEntry();
+
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+        const [line] = consoleErrorSpy.mock.calls[0];
+        expect(line).toContain('REPO must be in owner/repo_name form');
         expect(line.split('\n')).toHaveLength(1);
     });
 

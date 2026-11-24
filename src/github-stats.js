@@ -1,21 +1,16 @@
-import * as dotenv from 'dotenv';
+import 'dotenv/config';
 import { prepareStats } from './prepare-stats';
-import { printStats } from './print-stats/print-stats';
-import { requireEnvVars } from './tools/env-utils';
+import { printStats } from './print-stats';
+import { parseRepo, requireEnvVars } from './tools/env-utils';
 import { describeError } from './tools/error-utils';
 import { logger } from './tools/logger';
-
-dotenv.config();
 
 (async () => {
     try {
         const { COLLECTION_PATH, REPO } = requireEnvVars(['COLLECTION_PATH', 'REPO']);
         const { SINCE, UNTIL } = process.env;
 
-        const commonRequestData = {
-            owner: REPO.split('/')[0],
-            repo: REPO.split('/')[1],
-        };
+        const commonRequestData = parseRepo(REPO);
 
         const timePeriod = {
             until: UNTIL || new Date().toISOString(),

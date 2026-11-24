@@ -1,4 +1,4 @@
-jest.mock('dotenv', () => ({ config: jest.fn() }));
+jest.mock('dotenv/config', () => ({}));
 jest.mock('../src/prepare-stats', () => ({
     prepareStats: jest.fn(async () => ({})),
 }));
@@ -77,6 +77,21 @@ describe('github-publish entry', () => {
         expect(exitSpy).toHaveBeenCalledWith(1);
         const [line] = consoleErrorSpy.mock.calls[0];
         expect(line).toContain('SLACK_OAUTH_TOKEN, SLACK_CHANNEL_ID environment variables must be set');
+        expect(line.split('\n')).toHaveLength(1);
+    });
+
+    it('prints one line and exits with code 1 when REPO has no owner part', () => {
+        process.env.COLLECTION_PATH = './stats-data';
+        process.env.REPO = 'no-slash';
+        process.env.SLACK_OAUTH_TOKEN = 'token';
+        process.env.SLACK_CHANNEL_ID = 'channel';
+
+        loadEntry();
+
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+        const [line] = consoleErrorSpy.mock.calls[0];
+        expect(line).toContain('REPO must be in owner/repo_name form');
         expect(line.split('\n')).toHaveLength(1);
     });
 

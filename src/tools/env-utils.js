@@ -22,3 +22,28 @@ export const requireEnvVars = (names, env = process.env) => {
 
     return Object.fromEntries(names.map((name) => [name, env[name]]));
 };
+
+/**
+ * Split a repository identifier in `owner/repo_name` form.
+ *
+ * A CLI entry reads `REPO` as one variable, while the GitHub API takes the
+ * owner and the name separately. A value without both parts cannot reach
+ * the API, so it fails here with one line instead of an API error.
+ *
+ * @param {string} value Repository identifier.
+ *
+ * @returns {{owner: string, repo: string}} Repository owner and name.
+ *
+ * @throws {Error} The value is not in `owner/repo_name` form.
+ */
+export const parseRepo = (value) => {
+    const parts = value.split('/');
+
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+        throw new Error(`REPO must be in owner/repo_name form, got "${value}"`);
+    }
+
+    const [owner, repo] = parts;
+
+    return { owner, repo };
+};

@@ -1,4 +1,4 @@
-jest.mock('dotenv', () => ({ config: jest.fn() }));
+jest.mock('dotenv/config', () => ({}));
 jest.mock('../src/poll-events', () => ({
     pollEvents: jest.fn(),
 }));
@@ -64,13 +64,40 @@ describe('github-poll entry', () => {
     });
 
     it('exits with code 1 when the poll fails', async () => {
-        pollEvents.mockResolvedValueOnce({ success: false, error: 'rate limit' });
+        // The real failure shape: a failed poll always carries an `error` and
+        // the metadata of the run.
+        pollEvents.mockResolvedValueOnce({
+            success: false,
+            error: 'rate limit',
+            metadata: {
+                timestamp: new Date().toISOString(),
+                error: 'rate limit',
+                rateLimitReached: true,
+                rateLimitReset: null,
+            },
+        });
 
         loadEntry();
         await flushPromises();
 
         expect(exitSpy).toHaveBeenCalledWith(1);
-        expect(consoleErrorSpy.mock.calls.map((call) => call[0])).toContain('Error: rate limit');
+        // One line, no metadata dump: `pollEvents()` already logged the reason.
+        expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+            '❌ Failed to collect GitHub events: rate limit',
+        );
+    });
+
+    it('prints one line and exits with code 1 when REPO has no owner part', () => {
+        process.env.REPO = 'no-slash';
+
+        loadEntry();
+
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+        const [line] = consoleErrorSpy.mock.calls[0];
+        expect(line).toContain('REPO must be in owner/repo_name form');
+        expect(line.split('\n')).toHaveLength(1);
     });
 
     it('does not exit when an empty batch succeeds', async () => {
