@@ -3,9 +3,12 @@ import { format } from 'date-fns';
 const repoStatToString = (repoStats) => {
     const { until, since } = repoStats.timePeriod;
 
-    const fromStr = format(new Date(since), 'yyy-MM-dd HH-mm-ss');
     const untilStr = format(new Date(until), 'yyy-MM-dd HH-mm-ss');
-    const periodString = `from ${fromStr} to ${untilStr}`;
+    // Without a lower bound the report covers every stored event, so the
+    // period has only an upper bound.
+    const periodString = since
+        ? `from ${format(new Date(since), 'yyy-MM-dd HH-mm-ss')} to ${untilStr}`
+        : `up to ${untilStr}`;
 
     const statString = `
     ## General repo statistics \n

@@ -150,6 +150,52 @@ describe('prepareStats — reconciles missing closures from REST', () => {
     });
 });
 
+describe('prepareStats — no SINCE', () => {
+    afterEach(() => {
+        delete process.env.RECONCILE;
+        // eslint-disable-next-line global-require
+        const gh = require('../../src/tools/gh-utils');
+        gh.getClosedIssuesInWindow.mockClear();
+        gh.getPullsInWindow.mockClear();
+        gh.getCommitsInWindow.mockClear();
+    });
+
+    it('reads every stored day and ignores RECONCILE without a lower bound', async () => {
+        process.env.RECONCILE = 'true';
+        const dir = await writeCollection([{
+            id: 'comment-1',
+            type: 'IssueCommentEvent',
+            created_at: '2026-11-01T12:00:00Z',
+            actor: { login: 'alice' },
+            payload: { action: 'created', issue: { labels: [] } },
+        }], 'stats-no-since-');
+        // eslint-disable-next-line global-require
+        const gh = require('../../src/tools/gh-utils');
+        gh.getClosedIssuesInWindow.mockClear();
+        gh.getPullsInWindow.mockClear();
+        gh.getCommitsInWindow.mockClear();
+        const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+
+        try {
+            const stats = await prepareStats(
+                dir,
+                { owner: 'AdguardTeam', repo: 'AdguardFilters' },
+                { until: '2026-11-01T23:59:59Z' },
+            );
+
+            expect(stats.activitiesByUser.alice.totalComments).toBe(1);
+            // Without SINCE the walks have no window to cover.
+            expect(gh.getClosedIssuesInWindow).not.toHaveBeenCalled();
+            expect(gh.getPullsInWindow).not.toHaveBeenCalled();
+            expect(warn).toHaveBeenCalledWith(
+                expect.stringContaining('RECONCILE is ignored without SINCE'),
+            );
+        } finally {
+            warn.mockRestore();
+        }
+    });
+});
+
 describe('prepareStats — commit reconciliation', () => {
     const commitWindow = { since: '2026-11-01T00:00:00Z', until: '2026-11-01T23:59:59Z' };
 

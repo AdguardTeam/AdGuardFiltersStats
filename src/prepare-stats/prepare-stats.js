@@ -98,7 +98,13 @@ export const prepareStats = async (collectionPath, commonRequestData, timePeriod
     let injectedEvents = [];
     let reconcileError = null;
     let reconcileTruncated = false;
-    if (process.env.RECONCILE === 'true') {
+    if (process.env.RECONCILE === 'true' && !timePeriod.since) {
+        // Reconciliation needs a lower bound: without one its walks would
+        // scan the whole history, and the report itself already covers every
+        // stored day.
+        logger.warn('⚠️ RECONCILE is ignored without SINCE: reconciliation needs a reporting window.');
+    }
+    if (process.env.RECONCILE === 'true' && timePeriod.since) {
         const reconciliation = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
         injectedEvents = reconciliation.injectedEvents;
         reconcileError = reconciliation.error;
