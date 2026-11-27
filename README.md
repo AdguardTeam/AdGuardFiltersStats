@@ -54,9 +54,11 @@ is needed.
 ### Time window
 
 `github-stats` and `github-publish` operate on a time window defined by
-`SINCE` and `UNTIL`. If `SINCE` is omitted, all stored events are used.
-If `UNTIL` is omitted, the current time is used. Daily files and their
-metadata sidecars older than 30 days are automatically pruned during
+`SINCE` and `UNTIL`. `github-stats` uses every stored event when `SINCE`
+is omitted and the current time when `UNTIL` is omitted.
+`github-publish` defaults both bounds to the previous calendar day:
+`SINCE` is the start of that day and `UNTIL` is its end. Day files and
+their metadata sidecars older than 30 days are pruned during
 `github-poll`.
 
 ### Stats accuracy
@@ -277,8 +279,8 @@ entries load a `.env` file from the working directory if one exists.
 | `COLLECTION_PATH` | All commands                             | Directory for daily JSONL files and metadata sidecars.                                                                                                                           |
 | `REPO`            | All commands                             | Target repository in `owner/repo_name` form.                                                                                                                                     |
 | `GITHUB_TOKEN`    | `poll` (recommended), `stats`, `publish` | GitHub Personal Access Token. Raises the API rate limit from 60 to 5000 requests per hour.                                                                                       |
-| `SINCE`           | `stats`, `publish`                       | Lower bound of the time window (ISO 8601). All stored events are used if omitted.                                                                                                |
-| `UNTIL`           | `stats`, `publish`                       | Upper bound of the time window (ISO 8601). Defaults to now if omitted.                                                                                                           |
+| `SINCE`           | `stats`, `publish`                       | Lower bound of the time window (ISO 8601). `stats` uses every stored event if omitted. `publish` defaults to the start of the previous calendar day.                             |
+| `UNTIL`           | `stats`, `publish`                       | Upper bound of the time window (ISO 8601). `stats` defaults to now if omitted. `publish` defaults to the end of the previous calendar day.                                       |
 | `RECONCILE`       | —                                        | Set to `true` to back-fill missing issue and PR events from the GitHub REST API during `stats`/`publish`. Commit activity is read from the REST API. Disabled by default.        |
 
 `RECONCILE` reconciliation needs `SINCE`: without a lower bound it is

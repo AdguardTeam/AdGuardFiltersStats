@@ -33,9 +33,10 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 - A Slack failure now rejects `publishMessage()` and `replyMessage()`, so
   `github-publish` reports the Slack reason on one line and exits non-zero
   instead of crashing on `undefined` or exiting 0 after a failed reply.
-- `github-stats` and `github-publish` without `SINCE` now read every
-  stored day, as documented, instead of failing with `Invalid interval`.
-  `RECONCILE` needs `SINCE` and is ignored with a warning otherwise.
+- `github-stats` without `SINCE` now reads every stored day, as
+  documented, instead of failing with `Invalid interval`.
+  `github-publish` keeps its previous-calendar-day defaults. `RECONCILE`
+  needs `SINCE` and is ignored with a warning otherwise.
 - `github-poll` now removes a metadata sidecar together with its day file
   when the day is older than `EVENT_EXPIRATION_DAYS`, so the sidecars no
   longer accumulate without limit. The first poll after upgrading also

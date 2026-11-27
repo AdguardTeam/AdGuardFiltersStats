@@ -88,15 +88,15 @@ CLI entry script in [src/](./src/).
 
 The supported variables are:
 
-| Variable            | Required for                             | Description                                                                  |
-| ------------------- | ---------------------------------------- | ---------------------------------------------------------------------------- |
-| `COLLECTION_PATH`   | `poll`, `stats`, `publish`               | Directory where daily JSONL event files and metadata sidecars are stored.    |
-| `REPO`              | `poll`, `stats`, `publish`               | Target repository in `{owner}/{repo_name}` form.                             |
-| `GITHUB_TOKEN`      | `poll` (recommended), `stats`, `publish` | GitHub PAT. Without it, requests are limited to 60/hour.                     |
-| `SINCE`             | `stats`, `publish`                       | ISO 8601 timestamp (`YYYY-MM-DDTHH:MM:SSZ`). Lower bound of the stat window. |
-| `UNTIL`             | `stats`, `publish`                       | ISO 8601 timestamp. Upper bound of the stat window. Defaults to now.         |
-| `SLACK_OAUTH_TOKEN` | `publish`                                | Slack bot token (`xoxb-...`).                                                |
-| `SLACK_CHANNEL_ID`  | `publish`                                | Slack channel id to post to.                                                 |
+| Variable            | Required for                             | Description                                                                    |
+| ------------------- | ---------------------------------------- | ------------------------------------------------------------------------------ |
+| `COLLECTION_PATH`   | `poll`, `stats`, `publish`               | Directory where daily JSONL event files and metadata sidecars are stored.      |
+| `REPO`              | `poll`, `stats`, `publish`               | Target repository in `{owner}/{repo_name}` form.                               |
+| `GITHUB_TOKEN`      | `poll` (recommended), `stats`, `publish` | GitHub PAT. Without it, requests are limited to 60/hour.                       |
+| `SINCE`             | `stats`, `publish`                       | ISO 8601 lower bound. `stats`: all stored days; `publish`: previous day start. |
+| `UNTIL`             | `stats`, `publish`                       | ISO 8601 upper bound. `stats`: now; `publish`: previous day end.               |
+| `SLACK_OAUTH_TOKEN` | `publish`                                | Slack bot token (`xoxb-...`).                                                  |
+| `SLACK_CHANNEL_ID`  | `publish`                                | Slack channel id to post to.                                                   |
 
 When you add a new variable, also update [.env-example](./.env-example)
 and the relevant section in [README.md](./README.md).
