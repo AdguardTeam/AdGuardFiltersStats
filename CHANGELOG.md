@@ -41,7 +41,9 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
   back to one commit per stored `PushEvent`.
 - `github-poll` now removes a metadata sidecar together with its day file
   when the day is older than `EVENT_EXPIRATION_DAYS`, so the sidecars no
-  longer accumulate without limit. The first poll after upgrading also
+  longer accumulate without limit. The cleanup matches the full
+  `YYYY-MM-DD.jsonl` or `YYYY-MM-DD-metadata.json` name, so a date-like
+  backup file is left in place. The first poll after upgrading also
   removes the sidecars that earlier versions left behind; keep a copy
   outside the collection if that history is needed.
 - `github-poll` now stops a gap reconciliation at a 3-minute budget, so a

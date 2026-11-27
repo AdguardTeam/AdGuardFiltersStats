@@ -27,7 +27,6 @@ import {
 import {
     MILLISECONDS_IN_DAY,
     COLLECTION_FILE_EXTENSION,
-    METADATA_FILE_SUFFIX,
 } from '../constants';
 import { logger } from './logger';
 
@@ -83,26 +82,26 @@ const getEventsFromFile = async (path, timePeriod) => {
 };
 
 /**
- * Extract the day from a collection file name.
+ * Pattern of a file that belongs to the collection.
  *
  * A day file is `YYYY-MM-DD.jsonl` and its sidecar is
- * `YYYY-MM-DD-metadata.json`. Any other file is not part of the
- * collection and is left in place.
+ * `YYYY-MM-DD-metadata.json`. The pattern covers the whole name, so a
+ * date-like file such as `YYYY-MM-DD-backup.jsonl` is not a collection
+ * file and is left in place.
+ */
+const COLLECTION_FILE_NAME_PATTERN = /^(\d{4}-\d{2}-\d{2})(?:\.jsonl|-metadata\.json)$/;
+
+/**
+ * Extract the day from a collection file name.
  *
  * @param {string} filename File name from the collection directory.
  *
  * @returns {string|null} The `YYYY-MM-DD` day, or `null` for another file.
  */
 const getCollectionFileDay = (filename) => {
-    const hasKnownSuffix = filename.endsWith(COLLECTION_FILE_EXTENSION)
-        || filename.endsWith(METADATA_FILE_SUFFIX);
-    if (!hasKnownSuffix) {
-        return null;
-    }
+    const match = COLLECTION_FILE_NAME_PATTERN.exec(filename);
 
-    const day = filename.slice(0, 10);
-
-    return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
+    return match ? match[1] : null;
 };
 
 /**

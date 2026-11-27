@@ -189,4 +189,15 @@ describe('removeOldFilesFromCollection', () => {
 
         expect((await readdir(dir)).sort()).toEqual(['2020-01-01.bak', 'notes.txt']);
     });
+
+    it('leaves a date-like backup file in place', async () => {
+        // The day and the suffix alone would match this name. Only the full
+        // `YYYY-MM-DD.jsonl` pattern is a day file.
+        const backupFile = '2020-01-01-backup.jsonl';
+        await writeFile(path.join(dir, backupFile), 'keep', 'utf8');
+
+        await removeOldFilesFromCollection(dir, 30);
+
+        expect(await readdir(dir)).toEqual([backupFile]);
+    });
 });
