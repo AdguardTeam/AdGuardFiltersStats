@@ -378,9 +378,9 @@ requests per hour; authenticated is 5000.
 
 **Stats are missing recent events**
 The GitHub Events API only returns the 300 most recent events per
-repository, and daily JSONL files older than `EVENT_EXPIRATION_DAYS`
-(30) are pruned during stat preparation. Run `github-poll` more
-frequently from CI to avoid gaps.
+repository, and daily JSONL files and their metadata sidecars older than
+`EVENT_EXPIRATION_DAYS` (30) are pruned during `github-poll`. Run
+`github-poll` more frequently from CI to avoid gaps.
 
 Commit activity is different: it is read from the GitHub REST commits
 endpoint for the reporting window, not from the collected events. A

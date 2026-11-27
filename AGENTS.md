@@ -72,8 +72,8 @@ It is intended to be invoked from CI (e.g. GitHub Actions — see
       `github-poll` must be scheduled frequently enough to avoid gaps.
     - Unauthenticated requests are limited to 60/hour; provide
       `GITHUB_TOKEN` in production.
-    - Daily JSONL files older than `EVENT_EXPIRATION_DAYS` (30) are pruned
-      during stat preparation.
+    - Daily JSONL files and their metadata sidecars older than
+      `EVENT_EXPIRATION_DAYS` (30) are pruned during `github-poll`.
 - **Scale/Scope**: Single repository per invocation, single Slack channel
   per publish run. Designed for the AdGuard filter repositories
   (see `TEAM_MEMBERS` in [src/constants.js](./src/constants.js)) but
