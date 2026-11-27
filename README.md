@@ -45,11 +45,7 @@ Events are stored as one JSONL file per day (`YYYY-MM-DD.jsonl`) under
 tracks how many events were fetched, how many were written after
 deduplication, and rate-limit status.
 
-A day file and its metadata sidecar expire together after 30 days. The
-first poll after this version also removes the sidecars that earlier
-versions left behind, so a collection that holds older sidecars loses
-them on that run. Keep a copy outside `COLLECTION_PATH` if that history
-is needed.
+A day file and its metadata sidecar expire together after 30 days.
 
 ### Time window
 
@@ -157,8 +153,7 @@ Each run fetches the most recent events from the GitHub Events API,
 removes duplicates already present in today's JSONL file, and appends
 new ones. The metadata sidecar is updated in place. Re-running on the
 same day is safe and idempotent. Day files and their metadata sidecars
-older than 30 days are removed; the first run after this version also
-removes the older sidecars left by earlier runs.
+older than 30 days are removed.
 
 An event whose `created_at` is not a readable timestamp string is skipped
 with a warning that counts it. A poll that returns no events still
