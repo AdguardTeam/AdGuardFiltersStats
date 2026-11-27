@@ -102,14 +102,19 @@ describe('getEventsFromCollection', () => {
         );
     };
 
-    it('reads every stored day when since is absent', async () => {
+    it('reads every stored day when since is absent and ignores the sidecar', async () => {
         await writeDay('2026-11-01', 'first');
         await writeDay('2026-11-02', 'second');
+        // A real collection has a sidecar next to every day file. The read
+        // must not treat it as a day file.
+        await writeFile(
+            path.join(dir, '2026-11-01-metadata.json'),
+            JSON.stringify([{ timestamp: '2026-11-01T12:00:00Z' }]),
+            'utf8',
+        );
 
-        const events = await getEventsFromCollection(dir, {
-            since: undefined,
-            until: '9999-12-31T23:59:59Z',
-        });
+        // No bounds at all: an unwanted sidecar read would reach the result.
+        const events = await getEventsFromCollection(dir, {});
 
         expect(events.map((event) => event.id)).toEqual(['first', 'second']);
     });
