@@ -81,7 +81,8 @@ describe('github-poll entry', () => {
         await flushPromises();
 
         expect(exitSpy).toHaveBeenCalledWith(1);
-        // One line, no metadata dump: `pollEvents()` already logged the reason.
+        // One line, no stack trace and no metadata dump. This entry is the
+        // only place that reports the reason.
         expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
         expect(consoleErrorSpy).toHaveBeenCalledWith(
             '❌ Failed to collect GitHub events: rate limit',
