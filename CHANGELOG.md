@@ -36,7 +36,9 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 - `github-stats` without `SINCE` now reads every stored day, as
   documented, instead of failing with `Invalid interval`.
   `github-publish` keeps its previous-calendar-day defaults. `RECONCILE`
-  needs `SINCE` and is ignored with a warning otherwise.
+  needs `SINCE` and is ignored with a warning otherwise. The commits
+  request also needs `SINCE`, so a run without it warns before it falls
+  back to one commit per stored `PushEvent`.
 - `github-poll` now removes a metadata sidecar together with its day file
   when the day is older than `EVENT_EXPIRATION_DAYS`, so the sidecars no
   longer accumulate without limit. The first poll after upgrading also

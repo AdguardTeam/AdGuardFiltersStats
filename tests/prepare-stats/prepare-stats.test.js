@@ -187,8 +187,14 @@ describe('prepareStats — no SINCE', () => {
             // Without SINCE the walks have no window to cover.
             expect(gh.getClosedIssuesInWindow).not.toHaveBeenCalled();
             expect(gh.getPullsInWindow).not.toHaveBeenCalled();
+            // The commits request needs a lower bound too, and the fallback
+            // must be visible in the log.
+            expect(gh.getCommitsInWindow).not.toHaveBeenCalled();
             expect(warn).toHaveBeenCalledWith(
                 expect.stringContaining('RECONCILE is ignored without SINCE'),
+            );
+            expect(warn).toHaveBeenCalledWith(
+                expect.stringContaining('SINCE is not set, so the commits request is skipped'),
             );
         } finally {
             warn.mockRestore();

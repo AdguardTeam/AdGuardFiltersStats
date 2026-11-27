@@ -71,7 +71,9 @@ or how many commits a push contains. The REST endpoint attributes each
 commit to its author and counts one activity point per commit. Commits
 without a linked GitHub author or without a committer date are skipped.
 When the request fails, the tools emit a warning and fall back to counting
-one commit per stored `PushEvent`.
+one commit per stored `PushEvent`. A window without `SINCE` also skips the
+commits request, because the request needs a lower bound; the tools warn
+and fall back in the same way.
 
 Pull request events can also have a reduced payload: opened and merged
 pull requests may omit the author, and a merged pull request arrives as
