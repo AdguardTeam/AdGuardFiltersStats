@@ -72,8 +72,8 @@ It is intended to be invoked from CI (e.g. GitHub Actions — see
       `github-poll` must be scheduled frequently enough to avoid gaps.
     - Unauthenticated requests are limited to 60/hour; provide
       `GITHUB_TOKEN` in production.
-    - Daily JSONL files older than `EVENT_EXPIRATION_DAYS` (30) are pruned
-      during stat preparation.
+    - Daily JSONL files and their metadata sidecars older than
+      `EVENT_EXPIRATION_DAYS` (30) are pruned during `github-poll`.
 - **Scale/Scope**: Single repository per invocation, single Slack channel
   per publish run. Designed for the AdGuard filter repositories
   (see `TEAM_MEMBERS` in [src/constants.js](./src/constants.js)) but
@@ -102,7 +102,7 @@ It is intended to be invoked from CI (e.g. GitHub Actions — see
 │   ├── publish-stats/            # Slack publishing orchestration
 │   ├── publish-utils/            # Slack client + Block Kit formatters
 │   │   └── format-utils/         # Block Kit builders, pruning
-│   └── tools/                    # Shared helpers (fs, gh, streams, print, errors)
+│   └── tools/                    # Shared helpers (fs, gh, streams, print, errors, env)
 ├── tests/                        # Jest tests mirroring src/ layout
 │   ├── publish-utils/            # Tests for Slack block formatters
 │   └── test-files/               # Fixtures
@@ -233,7 +233,8 @@ Universal principles the codebase follows:
   names) instead of magic strings.
 - **Observability Built-in** — `github-poll` logs structured progress and
   rate-limit warnings to stdout/stderr. New long-running steps SHOULD
-  log similarly via `console.log` / `console.warn`.
+  log similarly through `logger` from
+  [src/tools/logger.js](./src/tools/logger.js).
 - **Keep It Boring** — prefer well-understood Node patterns
   (`async/await`, plain objects) over clever or novel
   solutions.
@@ -281,9 +282,13 @@ conventions not covered by the linter.
 - **No formatter / no type checker**: There is no Prettier, no TypeScript.
   Match the surrounding style; let ESLint catch deviations.
 - **Error handling**: Top-level CLI entry scripts SHOULD wrap their main
-  IIFE in `try/catch`, log via `console.error`, and `process.exit(1)` on
-  failure. Library functions SHOULD throw normal `Error` instances; let
-  the caller decide how to recover.
+  IIFE in `try/catch`, log one line through `logger.error`, and
+  `process.exit(1)` on failure. Library functions SHOULD throw normal
+  `Error` instances; let the caller decide how to recover. An entry MUST
+  read every required environment variable through `requireEnvVars` from
+  [src/tools/env-utils.js](./src/tools/env-utils.js) before it reads any
+  other value, so an absent variable reports one line that names it
+  instead of a `TypeError`.
 - **Stream errors**: A stream pipeline MUST surface an inner-stream error
   as a rejection of the exported async function, never as a process-level
   unhandled `error` event. `stream-chain` re-emits the error of every inner
@@ -333,11 +338,14 @@ conventions not covered by the linter.
   from metadata MUST be validated before a comparison: an unreadable value
   turns the comparison into `NaN`, which is false, so the check would pass
   without a message. Fall back to the other timestamp of the record and warn.
-- **Logging**: Use `console.log` for progress, `console.warn` for
-  recoverable issues (rate-limit warnings, missing optional data), and
-  `console.error` for fatal errors. Disable the `no-console` ESLint rule
-  inline (`// eslint-disable-next-line no-console`) at each call site, as
-  done elsewhere in the codebase. An error message that reaches a log line
+- **Logging**: Use `logger` from
+  [src/tools/logger.js](./src/tools/logger.js): `logger.log` for progress,
+  `logger.warn` for recoverable issues (rate-limit warnings, missing
+  optional data), and `logger.error` for fatal errors. The module wraps
+  `console` and centralizes the `no-console` ESLint disable. A direct
+  `console` call disables the rule inline
+  (`// eslint-disable-next-line no-console`) at each call site. An error
+  message that reaches a log line
   or a metadata record MUST go through `normalizeErrorMessage` from
   [src/tools/error-utils.js](./src/tools/error-utils.js): it collapses
   whitespace to one line and bounds the length. A field that joins several
@@ -415,7 +423,10 @@ vulnerabilities, supply-chain risks, and long-term maintenance cost.
 
 - **Runtime configuration**: All configuration is provided via
   environment variables, loaded by `dotenv` at the top of each CLI entry
-  in [src/](./src/). The supported variables are:
+  in [src/](./src/). An entry MUST put `import 'dotenv/config';` first:
+  `gh-utils` reads `GITHUB_TOKEN` and creates its client at import time,
+  and a later `dotenv.config()` would not authenticate it. The supported
+  variables are:
   `COLLECTION_PATH`, `GITHUB_TOKEN`, `REPO`, `SINCE`, `UNTIL`,
   `SLACK_OAUTH_TOKEN`, `SLACK_CHANNEL_ID`. See
   [README.md#configuration](./README.md#configuration) for semantics.

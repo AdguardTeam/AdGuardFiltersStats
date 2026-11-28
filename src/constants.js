@@ -102,6 +102,7 @@ export const DECISION_REVIEW_STATES = [
 ];
 
 export const COLLECTION_FILE_EXTENSION = '.jsonl';
+export const METADATA_FILE_SUFFIX = '-metadata.json';
 
 /**
  * Maximum number of most recent events to collect.

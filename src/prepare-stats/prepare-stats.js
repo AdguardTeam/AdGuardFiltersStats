@@ -41,6 +41,13 @@ const dedupeById = (events) => {
  */
 const fetchCommitEvents = async (commonRequestData, timePeriod, repoMeta) => {
     if (!timePeriod.since) {
+        // The commits endpoint needs a lower bound. Without it, the report
+        // falls back to one commit per stored PushEvent, which under-reports
+        // a push with several authors. Warn, so the fallback is visible.
+        logger.warn(
+            '⚠️ SINCE is not set, so the commits request is skipped. '
+            + 'Commit statistics fall back to one per stored PushEvent.',
+        );
         return null;
     }
     let commits;
@@ -98,7 +105,13 @@ export const prepareStats = async (collectionPath, commonRequestData, timePeriod
     let injectedEvents = [];
     let reconcileError = null;
     let reconcileTruncated = false;
-    if (process.env.RECONCILE === 'true') {
+    if (process.env.RECONCILE === 'true' && !timePeriod.since) {
+        // Reconciliation needs a lower bound: without one its walks would
+        // scan the whole history, and the report itself already covers every
+        // stored day.
+        logger.warn('⚠️ RECONCILE is ignored without SINCE: reconciliation needs a reporting window.');
+    }
+    if (process.env.RECONCILE === 'true' && timePeriod.since) {
         const reconciliation = await reconcileWindow(commonRequestData, timePeriod, repoMeta);
         injectedEvents = reconciliation.injectedEvents;
         reconcileError = reconciliation.error;

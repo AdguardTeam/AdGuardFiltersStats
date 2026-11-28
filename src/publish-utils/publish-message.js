@@ -1,25 +1,20 @@
 /**
  * Post a message to a channel your app is in.
  *
+ * A Slack failure rejects the call, so the entry reports its reason and
+ * fails the run instead of continuing with an undefined message.
+ *
  * @param {object} client Slack WebClient instance.
  * @param {object[]} message Array of formatted blocks.
  * @param {string} channelId Slack channel ID.
  *
- * @returns {object} Object with data about sent message.
+ * @returns {Promise<object>} Object with data about the sent message.
  */
 export async function publishMessage(client, message, channelId) {
-    let messageInfo;
-    try {
-        messageInfo = await client.chat.postMessage({
-            channel: channelId,
-            blocks: message,
-            unfurl_links: false,
-            unfurl_media: false,
-        });
-    } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error(error);
-    }
-
-    return messageInfo;
+    return client.chat.postMessage({
+        channel: channelId,
+        blocks: message,
+        unfurl_links: false,
+        unfurl_media: false,
+    });
 }

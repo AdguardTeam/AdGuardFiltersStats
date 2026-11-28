@@ -88,15 +88,15 @@ CLI entry script in [src/](./src/).
 
 The supported variables are:
 
-| Variable            | Required for                             | Description                                                                  |
-| ------------------- | ---------------------------------------- | ---------------------------------------------------------------------------- |
-| `COLLECTION_PATH`   | `poll`, `stats`, `publish`               | Directory where daily JSONL event files and metadata sidecars are stored.    |
-| `REPO`              | `poll`, `stats`, `publish`               | Target repository in `{owner}/{repo_name}` form.                             |
-| `GITHUB_TOKEN`      | `poll` (recommended), `stats`, `publish` | GitHub PAT. Without it, requests are limited to 60/hour.                     |
-| `SINCE`             | `stats`, `publish`                       | ISO 8601 timestamp (`YYYY-MM-DDTHH:MM:SSZ`). Lower bound of the stat window. |
-| `UNTIL`             | `stats`, `publish`                       | ISO 8601 timestamp. Upper bound of the stat window. Defaults to now.         |
-| `SLACK_OAUTH_TOKEN` | `publish`                                | Slack bot token (`xoxb-...`).                                                |
-| `SLACK_CHANNEL_ID`  | `publish`                                | Slack channel id to post to.                                                 |
+| Variable            | Required for                             | Description                                                                    |
+| ------------------- | ---------------------------------------- | ------------------------------------------------------------------------------ |
+| `COLLECTION_PATH`   | `poll`, `stats`, `publish`               | Directory where daily JSONL event files and metadata sidecars are stored.      |
+| `REPO`              | `poll`, `stats`, `publish`               | Target repository in `{owner}/{repo_name}` form.                               |
+| `GITHUB_TOKEN`      | `poll` (recommended), `stats`, `publish` | GitHub PAT. Without it, requests are limited to 60/hour.                       |
+| `SINCE`             | `stats`, `publish`                       | ISO 8601 lower bound. `stats`: all stored days; `publish`: previous day start. |
+| `UNTIL`             | `stats`, `publish`                       | ISO 8601 upper bound. `stats`: now; `publish`: previous day end.               |
+| `SLACK_OAUTH_TOKEN` | `publish`                                | Slack bot token (`xoxb-...`).                                                  |
+| `SLACK_CHANNEL_ID`  | `publish`                                | Slack channel id to post to.                                                   |
 
 When you add a new variable, also update [.env-example](./.env-example)
 and the relevant section in [README.md](./README.md).
@@ -298,9 +298,11 @@ regressed.
 
 ### Adding a new environment variable
 
-1. Read it from `process.env` at the top of the relevant CLI entry in
-   [src/](./src/), validating it and exiting non-zero on missing
-   required values.
+1. Add a required variable to the list passed to `requireEnvVars` from
+   [src/tools/env-utils.js](./src/tools/env-utils.js) at the top of the
+   relevant CLI entry in [src/](./src/). The helper reports every absent
+   variable in one line and the entry exits non-zero. Read an optional
+   variable, such as `SINCE` or `UNTIL`, directly from `process.env`.
 2. Add it to [.env-example](./.env-example) with a placeholder value.
 3. Document it in [README.md](./README.md#configuration) and in the table in
    [Step 3](#3-configure-environment-variables) of this guide.
@@ -360,10 +362,12 @@ your latest changes.
 You can also drop `debugger;` statements anywhere in `src/` or
 `tests/` — Babel preserves them.
 
-For ad-hoc logging, the project standard is plain `console.log` /
-`console.warn` / `console.error` with an inline
-`// eslint-disable-next-line no-console` comment at each call site, as
-already used in the codebase.
+For ad-hoc logging, use `logger` from
+[src/tools/logger.js](./src/tools/logger.js) (`logger.log`,
+`logger.warn`, `logger.error`). The wrapper forwards to `console` and
+centralizes the `no-console` disable. A direct `console` call needs an
+inline `// eslint-disable-next-line no-console` comment at each call
+site.
 
 ## Troubleshooting
 
@@ -374,9 +378,9 @@ requests per hour; authenticated is 5000.
 
 **Stats are missing recent events**
 The GitHub Events API only returns the 300 most recent events per
-repository, and daily JSONL files older than `EVENT_EXPIRATION_DAYS`
-(30) are pruned during stat preparation. Run `github-poll` more
-frequently from CI to avoid gaps.
+repository, and daily JSONL files and their metadata sidecars older than
+`EVENT_EXPIRATION_DAYS` (30) are pruned during `github-poll`. Run
+`github-poll` more frequently from CI to avoid gaps.
 
 Commit activity is different: it is read from the GitHub REST commits
 endpoint for the reporting window, not from the collected events. A

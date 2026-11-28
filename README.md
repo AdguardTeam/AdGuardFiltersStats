@@ -45,12 +45,17 @@ Events are stored as one JSONL file per day (`YYYY-MM-DD.jsonl`) under
 tracks how many events were fetched, how many were written after
 deduplication, and rate-limit status.
 
+A day file and its metadata sidecar expire together after 30 days.
+
 ### Time window
 
 `github-stats` and `github-publish` operate on a time window defined by
-`SINCE` and `UNTIL`. If `SINCE` is omitted, all stored events are used.
-If `UNTIL` is omitted, the current time is used. Daily files older than
-30 days are automatically pruned during `github-poll`.
+`SINCE` and `UNTIL`. `github-stats` uses every stored event when `SINCE`
+is omitted and the current time when `UNTIL` is omitted.
+`github-publish` defaults both bounds to the previous calendar day:
+`SINCE` is the start of that day and `UNTIL` is its end. Day files and
+their metadata sidecars older than 30 days are pruned during
+`github-poll`.
 
 ### Stats accuracy
 
@@ -62,7 +67,9 @@ or how many commits a push contains. The REST endpoint attributes each
 commit to its author and counts one activity point per commit. Commits
 without a linked GitHub author or without a committer date are skipped.
 When the request fails, the tools emit a warning and fall back to counting
-one commit per stored `PushEvent`.
+one commit per stored `PushEvent`. A window without `SINCE` also skips the
+commits request, because the request needs a lower bound; the tools warn
+and fall back in the same way.
 
 Pull request events can also have a reduced payload: opened and merged
 pull requests may omit the author, and a merged pull request arrives as
@@ -145,7 +152,16 @@ unauthenticated requests to 60 per hour).
 Each run fetches the most recent events from the GitHub Events API,
 removes duplicates already present in today's JSONL file, and appends
 new ones. The metadata sidecar is updated in place. Re-running on the
-same day is safe and idempotent.
+same day is safe and idempotent. Day files and their metadata sidecars
+older than 30 days are removed.
+
+An event whose `created_at` is not a readable timestamp string is skipped
+with a warning that counts it. A poll that returns no events still
+succeeds: it records its metadata, runs the stale-file cleanup, and exits
+with code 0. The record is the gap baseline only when its backfill
+succeeded: a record with `backfillError` or `backfillBudgetExceeded` is
+skipped, and the next poll retries the gap from the previous successful
+poll.
 
 An Events API page request that fails with a transient error is retried
 up to three times with exponential backoff before the poll fails. A rate
@@ -200,13 +216,14 @@ on the next poll.)
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
 | `timestamp`              | ISO 8601 time when this poll ran                                                                                                 |
 | `totalEvents`            | Events fetched from GitHub API                                                                                                   |
-| `eventsInFile`           | Unique events written after deduplication                                                                                        |
+| `eventsInFile`           | Unique events in today's file after deduplication, not only the events of this poll                                              |
+| `skippedEvents`          | Events dropped from this poll because `created_at` is unreadable; the rest of `totalEvents` is written before deduplication      |
 | `pagesCollected`         | Number of API pages processed                                                                                                    |
 | `rateLimitReached`       | Whether the API rate limit was hit                                                                                               |
 | `rateLimitRemaining`     | Remaining API requests at poll time                                                                                              |
 | `rateLimitReset`         | ISO 8601 timestamp when the rate limit resets                                                                                    |
-| `oldestEventAt`          | `created_at` of the oldest event returned by this poll                                                                           |
-| `newestEventAt`          | `created_at` of the newest event returned by this poll                                                                           |
+| `oldestEventAt`          | `created_at` of the oldest readable event of this poll, or the poll `timestamp` when none is readable                            |
+| `newestEventAt`          | `created_at` of the newest readable event of this poll, or the poll `timestamp` when none is readable                            |
 | `gapSuspected`           | `true` if no successful poll for >90 min (a failed or budget-stopped backfill does not count) or an event-window gap is detected |
 | `backfillTruncated`      | `true` if a gap backfill stopped early (time budget or page limit)                                                               |
 | `backfillBudgetExceeded` | `true` if the time budget, rather than the page limit, stopped a backfill                                                        |
@@ -259,12 +276,14 @@ entries load a `.env` file from the working directory if one exists.
 | `COLLECTION_PATH` | All commands                             | Directory for daily JSONL files and metadata sidecars.                                                                                                                           |
 | `REPO`            | All commands                             | Target repository in `owner/repo_name` form.                                                                                                                                     |
 | `GITHUB_TOKEN`    | `poll` (recommended), `stats`, `publish` | GitHub Personal Access Token. Raises the API rate limit from 60 to 5000 requests per hour.                                                                                       |
-| `SINCE`           | `stats`, `publish`                       | Lower bound of the time window (ISO 8601). All stored events are used if omitted.                                                                                                |
-| `UNTIL`           | `stats`, `publish`                       | Upper bound of the time window (ISO 8601). Defaults to now if omitted.                                                                                                           |
+| `SINCE`           | `stats`, `publish`                       | Lower bound of the time window (ISO 8601). `stats` uses every stored event if omitted. `publish` defaults to the start of the previous calendar day.                             |
+| `UNTIL`           | `stats`, `publish`                       | Upper bound of the time window (ISO 8601). `stats` defaults to now if omitted. `publish` defaults to the end of the previous calendar day.                                       |
 | `RECONCILE`       | —                                        | Set to `true` to back-fill missing issue and PR events from the GitHub REST API during `stats`/`publish`. Commit activity is read from the REST API. Disabled by default.        |
 
-`RECONCILE` reconciliation stops at a 3-minute budget. When the budget is
-spent, the tools warn that the report may under-report.
+`RECONCILE` reconciliation needs `SINCE`: without a lower bound it is
+ignored with a warning, and the report covers every stored day. The
+reconciliation stops at a 3-minute budget. When the budget is spent, the
+tools warn that the report may under-report.
 
 ### Publishing variables
 
